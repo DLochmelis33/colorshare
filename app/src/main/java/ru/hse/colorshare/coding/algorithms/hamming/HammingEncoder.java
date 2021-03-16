@@ -12,6 +12,19 @@ import ru.hse.colorshare.coding.CodingTag;
 import ru.hse.colorshare.coding.Encoder;
 
 public class HammingEncoder implements Encoder {
+    private static final int SOURCE_FRAME_SIZE_DEFAULT = 15;
+
+    private final int sourceFrameSize;
+    private final int controlBits;
+
+    public HammingEncoder() {
+        this(SOURCE_FRAME_SIZE_DEFAULT);
+    }
+
+    public HammingEncoder(int sourceFrameSize) {
+        this.sourceFrameSize = sourceFrameSize;
+        this.controlBits = Util.calculateControlBits(sourceFrameSize);
+    }
 
     @NonNull
     @Override
@@ -26,15 +39,14 @@ public class HammingEncoder implements Encoder {
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
-    public BitSet encodeFrame(BitSet input) {
-        int inputLength = 15, countOfControlBits = 5;
-        boolean[] controlBits = Util.calculateControlBits(input, countOfControlBits);
-        BitSet resulting = new BitSet(inputLength + countOfControlBits);
-        Util.ofNonControl(inputLength).forEach(
+    private BitSet encodeFrame(BitSet input) {
+        boolean[] control = Util.calculateControlBits(input, controlBits);
+        BitSet resulting = new BitSet(sourceFrameSize + controlBits);
+        Util.ofNonControl(sourceFrameSize).forEach(
                 e -> resulting.set(e.actual, input.get(e.count))
         );
-        Util.ofControl(countOfControlBits).forEach(
-                e -> resulting.set(e.actual, controlBits[e.count])
+        Util.ofControl(controlBits).forEach(
+                e -> resulting.set(e.actual, control[e.count])
         );
         return resulting;
     }

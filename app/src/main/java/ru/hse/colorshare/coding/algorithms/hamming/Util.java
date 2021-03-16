@@ -9,8 +9,22 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 public class Util {
+
+    public static int calculateControlBits(int frameSize) {
+        return (int) Math.log(frameSize) + 1;
+    }
+
+    public static int fromBoolean(boolean[] array) {
+        assert array.length == Byte.SIZE;
+        int result = 0;
+        for (int i = 0; i < array.length; i++) {
+            result += array[i] ? (1 << i) : 0;
+        }
+        return result;
+    }
+
     public static class Entry {
-        final int actual, count;
+        public final int actual, count;
 
         public Entry(int actual, int count) {
             this.actual = actual;
@@ -20,9 +34,18 @@ public class Util {
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     public static boolean[] calculateControlBits(BitSet input, int countOfControlBits) {
+        return calculateParityBits(ofNonControl(input.length()), input, countOfControlBits);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    public static boolean[] calculateSyndrome(BitSet input, int countOfControlBits) {
+        return calculateParityBits(ofAll(input.length()), input, countOfControlBits);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    public static boolean[] calculateParityBits(Stream<Entry> positions, BitSet input, int countOfControlBits) {
         boolean[] controlBits = new boolean[countOfControlBits];
-        int length = input.length();
-        ofNonControl(length).forEach(
+        positions.forEach(
                 e -> {
                     for (int i = 0; i < controlBits.length; i++) {
                         controlBits[i] ^= ((((e.actual + 1) >> i) & 1) != 0) & input.get(e.count);
@@ -30,6 +53,19 @@ public class Util {
                 }
         );
         return controlBits;
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    public static Stream<Entry> ofAll(long limit) {
+        return Stream.generate(new Supplier<Entry>() {
+            int current = 0;
+
+            @Override
+            public Entry get() {
+                current++;
+                return new Entry(current - 1, current - 1);
+            }
+        }).limit(limit);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
