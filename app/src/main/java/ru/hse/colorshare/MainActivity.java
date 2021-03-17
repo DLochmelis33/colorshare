@@ -11,8 +11,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.view.View;
 
 import android.widget.Button;
+import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
+
+    private static final int cameraPermissionRequestCode = 55555; // !
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -20,17 +23,12 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         Button receiveButton = findViewById(R.id.receive_button);
-        receiveButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                tryStartReceiveActivity();
-            }
-        });
+        receiveButton.setOnClickListener(v -> tryStartReceiveActivity());
     }
 
     private void tryStartReceiveActivity() {
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.CAMERA}, 55555); // !
+            requestPermissions(new String[]{Manifest.permission.CAMERA}, cameraPermissionRequestCode);
         } else {
             startReceiveActivity();
         }
@@ -38,11 +36,11 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if(requestCode == 55555) { // !
+        if(requestCode == cameraPermissionRequestCode) {
             if(grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startReceiveActivity();
             } else {
-                throw new IllegalStateException("couldn't get camera permission");
+                Toast.makeText(this, "Camera permission is required, please grant it.", Toast.LENGTH_LONG).show();
             }
         }
     }

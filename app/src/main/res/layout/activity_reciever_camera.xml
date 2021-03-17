@@ -9,12 +9,17 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        tools:layout_editor_absoluteX="83dp"
-        tools:layout_editor_absoluteY="61dp">
+        tools:layout_editor_absoluteX="36dp"
+        tools:layout_editor_absoluteY="0dp">
 
         <SurfaceView
             android:id="@+id/cameraSurfaceView"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="auto"
+            android:focusableInTouchMode="true"
+            android:keepScreenOn="true"
+            android:visibility="visible" />
     </FrameLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
