@@ -1,10 +1,12 @@
 package ru.hse.colorshare;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
@@ -13,6 +15,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
 import android.view.SurfaceView;
+import android.view.TextureView;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -20,7 +23,9 @@ import java.util.Comparator;
 public class ReceiverCameraActivity extends AppCompatActivity {
 
     private CameraService cameraService;
-    private SurfaceView cameraSurfaceView; // ! will use to draw over camera image
+    private TextureView cameraTextureView; // ! will use to draw over camera image
+
+    private static final String logTag = "ReceiverCameraActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,7 +37,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             throw new AssertionError("expected camera permission");
         }
 
-        cameraSurfaceView = findViewById(R.id.cameraSurfaceView);
+        cameraTextureView = findViewById(R.id.cameraTextureView);
         cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, ImageStreamHandler.getInstance());
 
         String cameraId = chooseCamera();
@@ -40,7 +45,30 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             throw new IllegalStateException("couldn't get a suitable camera");
         }
 
-        cameraService.tryOpenCamera(cameraId, cameraSurfaceView.getHolder());
+//        cameraTextureView.setSurfaceTexture(new SurfaceTexture(555)); // !
+        cameraTextureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+            @Override
+            public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
+                cameraService.tryOpenCamera(cameraId, surface);
+            }
+
+            @Override
+            public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {
+                Log.d(logTag, "texture size changed");
+            }
+
+            @Override
+            public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
+                Log.d(logTag, "texture destroyed");
+                return false;
+            }
+
+            @Override
+            public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
+                Log.d(logTag, "texture updated");
+            }
+        });
+
     }
 
     // returns a camera that 1) is not monochrome 2) is of largest sensor area
@@ -51,12 +79,6 @@ public class ReceiverCameraActivity extends AppCompatActivity {
 
             for (String cameraId : manager.getCameraIdList()) {
                 CameraCharacteristics cameraCharacteristics = manager.getCameraCharacteristics(cameraId);
-
-                Log.d("BBBBBBB", Arrays.toString(manager.getCameraIdList()));
-
-                StreamConfigurationMap cfg = cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                // ! DEBUG
-                Log.d("AAAAAAA", "cam_id=" + cameraId + " \tformats=" + Arrays.toString(cfg.getOutputFormats()) + " \tlens_facing=" + cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) + " \tcolor=" + cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT));
 
                 if (cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
                         && cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT) != CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_MONO) {

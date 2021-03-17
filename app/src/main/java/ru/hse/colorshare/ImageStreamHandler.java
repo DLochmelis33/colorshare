@@ -1,5 +1,7 @@
 package ru.hse.colorshare;
 
+import android.media.Image;
+
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ImageStreamHandler {
@@ -18,7 +20,7 @@ public class ImageStreamHandler {
 
     }
 
-    private ConcurrentLinkedQueue<?> imageQueue;
+    private ConcurrentLinkedQueue<Image> imageQueue;
 
     public void addImage() {
         // ! TODO

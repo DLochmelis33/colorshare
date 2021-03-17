@@ -12,14 +12,13 @@
         tools:layout_editor_absoluteX="36dp"
         tools:layout_editor_absoluteY="0dp">
 
-        <SurfaceView
-            android:id="@+id/cameraSurfaceView"
+        <TextureView
+            android:id="@+id/cameraTextureView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:clickable="true"
             android:focusable="auto"
             android:focusableInTouchMode="true"
-            android:keepScreenOn="true"
-            android:visibility="visible" />
+            android:keepScreenOn="true" />
     </FrameLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

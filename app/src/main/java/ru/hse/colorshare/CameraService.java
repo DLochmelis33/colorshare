@@ -4,7 +4,7 @@ package ru.hse.colorshare;
 import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
-import android.graphics.ImageFormat;
+import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -16,7 +16,6 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
-import android.view.SurfaceHolder;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -24,7 +23,6 @@ import androidx.core.app.ActivityCompat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 
 public class CameraService {
     public final CameraManager manager;
@@ -32,7 +30,7 @@ public class CameraService {
     private CameraDevice cameraDevice;
     private final Activity startingActivity;
     private String cameraId;
-    private SurfaceHolder outputSurfaceHolder;
+    private SurfaceTexture previewSurfaceTexture;
     private final ImageStreamHandler imageStreamHandler;
 
     private static final String logTag = "cameraServiceLog";
@@ -52,7 +50,7 @@ public class CameraService {
         Log.d(logTag, Arrays.toString(sizes));
         for (Size size : sizes) {
             Log.d(logTag, size.getWidth() + "x" + size.getHeight());
-            double maxTheoreticalFps = 1e9 / config.getOutputMinFrameDuration(outputSurfaceHolder.getSurface().getClass(), size);
+            double maxTheoreticalFps = 1e9 / config.getOutputMinFrameDuration(previewSurfaceTexture.getClass(), size);
             double sizeEvaluation = size.getHeight() * size.getWidth() * maxTheoreticalFps;
             if (result == null || resultSizeEvaluation < sizeEvaluation) {
                 result = size;
@@ -74,28 +72,17 @@ public class CameraService {
                 CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
                 StreamConfigurationMap configurations = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 
-                if (!configurations.isOutputSupportedFor(outputSurfaceHolder.getSurface())) {
-                    throw new IllegalArgumentException("camera cannot output to given surface");
+                if (!StreamConfigurationMap.isOutputSupportedFor(previewSurfaceTexture.getClass())) {
+                    throw new IllegalArgumentException("camera cannot output to SurfaceTexture");
                 }
 
-                // ! DEBUG !
-                Log.d(logTag, Arrays.toString(configurations.getOutputFormats()));
-
-
-                /**
-                 * status report: everything messed up
-                 * 1) cant get the size list for outputting into Surface
-                 * 2) analysis should be using ImageReader in different thread
-                 */
-
-
-                Size preferredSize = calculateMaxThroughputSize(configurations);
-
-                outputSurfaceHolder.setFixedSize(preferredSize.getWidth(), preferredSize.getHeight());
+//                Size preferredSize = calculateMaxThroughputSize(configurations);
+//                outputSurfaceHolder.setFixedSize(preferredSize.getWidth(), preferredSize.getHeight());
 
                 // create CaptureRequest
                 CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD); // ! record vs preview?
-                builder.addTarget(outputSurfaceHolder.getSurface());
+                Surface previewSurface = new Surface(previewSurfaceTexture);
+                builder.addTarget(previewSurface);
                 // set capture request flags
                 builder.set(CaptureRequest.JPEG_QUALITY, (byte) 97); // !
                 builder.set(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_OFF); // disable some post-processing related to edges of objects
@@ -104,7 +91,7 @@ public class CameraService {
 
                 // submit a capture request by creating a session
                 ArrayList<Surface> surfacesList = new ArrayList<>();
-                surfacesList.add(outputSurfaceHolder.getSurface());
+                surfacesList.add(previewSurface);
                 // ! deprecated !
                 cameraDevice.createCaptureSession(surfacesList, new CameraCaptureSession.StateCallback() {
 
@@ -159,15 +146,15 @@ public class CameraService {
         this.manager = manager;
         this.cameraDevice = null;
         this.startingActivity = startingActivity;
-        this.outputSurfaceHolder = null;
+        this.previewSurfaceTexture = null;
         isCameraOpen = new AtomicBoolean(false);
         this.imageStreamHandler = imageStreamHandler;
         cameraId = null;
     }
 
-    public void tryOpenCamera(String cameraId, SurfaceHolder outputSurfaceHolder) {
+    public void tryOpenCamera(String cameraId, SurfaceTexture previewSurfaceTexture) {
         closeCamera();
-        this.outputSurfaceHolder = outputSurfaceHolder;
+        this.previewSurfaceTexture = previewSurfaceTexture;
         try {
             if (ActivityCompat.checkSelfPermission(startingActivity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 throw new IllegalStateException("was camera permission revoked?");
@@ -186,7 +173,7 @@ public class CameraService {
             isCameraOpen.set(false);
             cameraDevice.close();
             cameraDevice = null;
-            outputSurfaceHolder = null;
+            previewSurfaceTexture = null;
             cameraId = null;
         }
     }
