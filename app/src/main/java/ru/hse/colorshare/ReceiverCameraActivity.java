@@ -16,6 +16,8 @@ import android.util.Log;
 import android.util.Size;
 import android.view.SurfaceView;
 import android.view.TextureView;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -38,14 +40,13 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         }
 
         cameraTextureView = findViewById(R.id.cameraTextureView);
-        cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, ImageStreamHandler.getInstance());
+        cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView);
 
         String cameraId = chooseCamera();
         if (cameraId == null) {
             throw new IllegalStateException("couldn't get a suitable camera");
         }
 
-//        cameraTextureView.setSurfaceTexture(new SurfaceTexture(555)); // !
         cameraTextureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
@@ -54,7 +55,6 @@ public class ReceiverCameraActivity extends AppCompatActivity {
 
             @Override
             public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {
-                Log.d(logTag, "texture size changed");
             }
 
             @Override
@@ -65,7 +65,6 @@ public class ReceiverCameraActivity extends AppCompatActivity {
 
             @Override
             public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
-                Log.d(logTag, "texture updated");
             }
         });
 

@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="ru.hse.colorshare">
 
-    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:allowBackup="true"
@@ -11,7 +11,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Colorshare">
-        <activity android:name=".ReceiverCameraActivity">
+        <activity
+            android:name=".ReceiverCameraActivity"
+            android:screenOrientation="portrait">
         </activity>
         <activity
             android:name=".MainActivity"
@@ -19,7 +21,6 @@
             android:theme="@style/Theme.Colorshare.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
