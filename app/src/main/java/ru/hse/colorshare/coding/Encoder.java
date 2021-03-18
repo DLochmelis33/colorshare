@@ -6,12 +6,13 @@ import androidx.annotation.NonNull;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.util.BitSet;
 
 public interface Encoder {
 
     @NonNull CodingTag getTag();
 
     @NonNull
-    Object encode(@NonNull InputStream stream);
+    BitArray encode(@NonNull BitArray input);
 
 }

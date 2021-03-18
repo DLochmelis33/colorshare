@@ -1,12 +1,11 @@
 package ru.hse.colorshare.coding.algorithms.hamming;
 
-import android.os.Build;
-
-import androidx.annotation.RequiresApi;
 
 import java.util.BitSet;
-import java.util.function.Supplier;
-import java.util.stream.Stream;
+
+import ru.hse.colorshare.util.Generator;
+import ru.hse.colorshare.util.LimitGenerator;
+import ru.hse.colorshare.util.Supplier;
 
 public class Util {
 
@@ -32,18 +31,15 @@ public class Util {
         }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
     public static boolean[] calculateControlBits(BitSet input, int countOfControlBits) {
         return calculateParityBits(ofNonControl(input.length()), input, countOfControlBits);
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
     public static boolean[] calculateSyndrome(BitSet input, int countOfControlBits) {
         return calculateParityBits(ofAll(input.length()), input, countOfControlBits);
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public static boolean[] calculateParityBits(Stream<Entry> positions, BitSet input, int countOfControlBits) {
+    public static boolean[] calculateParityBits(Generator<Entry> positions, BitSet input, int countOfControlBits) {
         boolean[] controlBits = new boolean[countOfControlBits];
         positions.forEach(
                 e -> {
@@ -55,9 +51,8 @@ public class Util {
         return controlBits;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public static Stream<Entry> ofAll(long limit) {
-        return Stream.generate(new Supplier<Entry>() {
+    public static Generator<Entry> ofAll(long limit) {
+        return new LimitGenerator<>(new Supplier<Entry>() {
             int current = 0;
 
             @Override
@@ -65,12 +60,11 @@ public class Util {
                 current++;
                 return new Entry(current - 1, current - 1);
             }
-        }).limit(limit);
+        }, limit);
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public static Stream<Entry> ofNonControl(long limit) {
-        return Stream.generate(new Supplier<Entry>() {
+    public static Generator<Entry> ofNonControl(long limit) {
+        return new LimitGenerator<>(new Supplier<Entry>() {
             int actual = 0, count = 0;
             int up = 0;
 
@@ -82,12 +76,11 @@ public class Util {
                 }
                 return new Entry(actual++, count++);
             }
-        }).limit(limit);
+        }, limit);
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public static Stream<Entry> ofControl(long limit) {
-        return Stream.generate(new Supplier<Entry>() {
+    public static Generator<Entry> ofControl(long limit) {
+        return new LimitGenerator<>(new Supplier<Entry>() {
             int actual = 0, count = 0;
 
             @Override
@@ -95,6 +88,6 @@ public class Util {
                 actual = (1 << count) - 1;
                 return new Entry(actual, count++);
             }
-        }).limit(limit);
+        }, limit);
     }
 }

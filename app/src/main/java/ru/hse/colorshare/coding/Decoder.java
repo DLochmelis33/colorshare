@@ -7,5 +7,5 @@ import java.io.ByteArrayOutputStream;
 public interface Decoder {
     @NonNull CodingTag getTag();
 
-    @NonNull ByteArrayOutputStream decode(@NonNull ByteDataPresentation stream);
+    @NonNull Object decode(@NonNull Object stream);
 }

@@ -8,7 +8,6 @@ import androidx.annotation.RequiresApi;
 import java.io.ByteArrayOutputStream;
 import java.util.BitSet;
 
-import ru.hse.colorshare.coding.ByteDataPresentation;
 import ru.hse.colorshare.coding.CodingTag;
 import ru.hse.colorshare.coding.Decoder;
 
@@ -29,9 +28,10 @@ public class HammingDecoder implements Decoder {
 
     @NonNull
     @Override
-    public ByteArrayOutputStream decode(@NonNull ByteDataPresentation stream) {
+    public Object decode(@NonNull Object stream) {
         return null;
     }
+
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     private BitSet decodeFrame(BitSet input) {
