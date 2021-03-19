@@ -15,6 +15,14 @@ public class BitArray {
         this.length = length;
     }
 
+    public BitArray(boolean[] array) {
+        this.length = array.length;
+        this.data = new BitSet(array.length);
+        for (int i = 0; i < length; i++) {
+            this.data.set(i, array[i]);
+        }
+    }
+
     public BitArray(byte[] array) {
         this(array, 0, array.length);
     }

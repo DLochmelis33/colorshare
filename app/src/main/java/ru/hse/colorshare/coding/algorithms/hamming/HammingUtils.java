@@ -7,7 +7,7 @@ import ru.hse.colorshare.util.Generator;
 import ru.hse.colorshare.util.LimitGenerator;
 import ru.hse.colorshare.util.Supplier;
 
-public class Util {
+public class HammingUtils {
 
     public static int calculateControlBits(int frameSize) {
         return (int) Math.log(frameSize) + 1;
