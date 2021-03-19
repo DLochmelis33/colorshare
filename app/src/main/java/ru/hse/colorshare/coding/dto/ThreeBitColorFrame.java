@@ -1,4 +1,4 @@
-package ru.hse.colorshare.coding;
+package ru.hse.colorshare.coding.dto;
 
 import android.graphics.Color;
 
@@ -91,10 +91,10 @@ public final class ThreeBitColorFrame implements DataFrame {
             return unitOfBits(0);
         }
         if (array.length % UNIT_BITS_COUNT == 1) {
-            return array.data.get(array.length - 1) ? unitOfBits(0b110) : unitOfBits(0b100);
+            return array.get(array.length - 1) ? unitOfBits(0b110) : unitOfBits(0b100);
         }
-        boolean last = array.data.get(array.length - 1);
-        boolean prevLast = array.data.get(array.length - 2);
+        boolean last = array.get(array.length - 1);
+        boolean prevLast = array.get(array.length - 2);
         return unitOfBits((prevLast ? 1 << 2 : 0) + (last ? 1 << 1 : 0) + 1);
     }
 

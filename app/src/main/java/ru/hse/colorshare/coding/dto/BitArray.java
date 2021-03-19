@@ -1,9 +1,9 @@
-package ru.hse.colorshare.coding;
+package ru.hse.colorshare.coding.dto;
 
 import java.util.BitSet;
 
 public class BitArray {
-    public final BitSet data;
+    private final BitSet data;
     public final int length;
 
     public BitArray(int length) {
@@ -13,14 +13,6 @@ public class BitArray {
     public BitArray(BitSet data, int length) {
         this.data = data;
         this.length = length;
-    }
-
-    public BitArray(boolean[] array) {
-        this.length = array.length;
-        this.data = new BitSet(array.length);
-        for (int i = 0; i < length; i++) {
-            this.data.set(i, array[i]);
-        }
     }
 
     public BitArray(byte[] array) {
@@ -35,5 +27,17 @@ public class BitArray {
                 this.data.set(inArray * Byte.SIZE + inByte, ((array[inArray] >> inByte) & 1) != 0);
             }
         }
+    }
+
+    public boolean get(int index) {
+        return data.get(index);
+    }
+
+    public void set(int index, boolean value) {
+        data.set(index, value);
+    }
+
+    public void flip(int index) {
+        data.flip(index);
     }
 }

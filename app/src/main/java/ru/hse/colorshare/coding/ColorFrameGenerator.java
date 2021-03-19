@@ -2,10 +2,11 @@ package ru.hse.colorshare.coding;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.Queue;
 
+import ru.hse.colorshare.coding.dto.BitArray;
+import ru.hse.colorshare.coding.dto.DataFrame;
 import ru.hse.colorshare.util.Function;
 import ru.hse.colorshare.util.Generator;
 
@@ -24,27 +25,26 @@ public final class ColorFrameGenerator implements Generator<DataFrame> {
 
     private final Queue<DataFrame> queue;
 
-    private final Function<BitArray, ? extends DataFrame> mapper;
+    private final Function<BitArray, ? extends DataFrame> toDataFrame;
 
-    public ColorFrameGenerator(InputStream stream, Encoder encoder, Function<BitArray, ? extends DataFrame> mapper) {
-        this(stream, encoder, mapper, TO_READ_SIZE_DEFAULT, TO_ENCODE_SIZE_DEFAULT);
-    }
-
-    public ColorFrameGenerator(InputStream stream, Encoder encoder, Function<BitArray, ? extends DataFrame> mapper, int toReadSize, int toEncodeSize) {
+    public ColorFrameGenerator(BufferedInputStream stream, Encoder encoder, Function<BitArray, ? extends DataFrame> toDataFrame) {
+        this.encodeSize = TO_ENCODE_SIZE_DEFAULT;
+        this.stream = stream;
+        this.toRead = new byte[TO_READ_SIZE_DEFAULT];
         this.encoder = encoder;
-        this.stream = new BufferedInputStream(stream);
         this.queue = new ArrayDeque<>();
-        this.encodeSize = toEncodeSize;
-        this.toRead = new byte[toReadSize];
-        this.mapper = mapper;
+        this.toDataFrame = toDataFrame;
     }
 
+    /*
+        Potentially in another thread
+     */
 
     private void readStream() throws IOException {
         int actuallyRed = stream.read(toRead);
-        for (int i = 0; i < actuallyRed; i++) {
+        for (int i = 0; i < actuallyRed; i+= encodeSize) {
             queue.add(
-                    mapper.apply(encoder.encode(new BitArray(toRead, i, encodeSize)))
+                    toDataFrame.apply(encoder.encode(new BitArray(toRead, i, encodeSize)))
             );
         }
         isAvailable = stream.available() > 0;

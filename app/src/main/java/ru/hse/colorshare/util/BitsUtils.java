@@ -1,6 +1,6 @@
 package ru.hse.colorshare.util;
 
-import ru.hse.colorshare.coding.BitArray;
+import ru.hse.colorshare.coding.dto.BitArray;
 
 public class BitsUtils {
 
@@ -24,7 +24,7 @@ public class BitsUtils {
         }
         int value = 0;
         for (int i = 0; i < length; i++) {
-            value += array.data.get(offset + length) ? (1 << i) : 0;
+            value += array.get(offset + length) ? (1 << i) : 0;
         }
         return value;
     }

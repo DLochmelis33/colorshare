@@ -1,50 +1,39 @@
 package ru.hse.colorshare.coding.algorithms.hamming;
 
 
-import java.util.BitSet;
-
+import ru.hse.colorshare.coding.dto.BitArray;
+import ru.hse.colorshare.coding.dto.ShortBitArray;
+import ru.hse.colorshare.util.BitsUtils;
 import ru.hse.colorshare.util.Generator;
 import ru.hse.colorshare.util.LimitGenerator;
 import ru.hse.colorshare.util.Supplier;
 
 public class HammingUtils {
 
-    public static int calculateControlBits(int frameSize) {
-        return (int) Math.log(frameSize) + 1;
-    }
-
-    public static int fromBoolean(boolean[] array) {
-        assert array.length == Byte.SIZE;
-        int result = 0;
-        for (int i = 0; i < array.length; i++) {
-            result += array[i] ? (1 << i) : 0;
-        }
-        return result;
-    }
-
     public static class Entry {
-        public final int actual, count;
+        public final int value, index;
 
-        public Entry(int actual, int count) {
-            this.actual = actual;
-            this.count = count;
+        public Entry(int value, int index) {
+            this.value = value;
+            this.index = index;
         }
     }
 
-    public static boolean[] calculateControlBits(BitSet input, int countOfControlBits) {
-        return calculateParityBits(ofNonControl(input.length()), input, countOfControlBits);
+    public static ShortBitArray calculateControlBits(BitArray input, int countOfControlBits) {
+        return calculateParityBits(ofNonControl(input.length), input, countOfControlBits);
     }
 
-    public static boolean[] calculateSyndrome(BitSet input, int countOfControlBits) {
-        return calculateParityBits(ofAll(input.length()), input, countOfControlBits);
+    public static ShortBitArray calculateSyndrome(BitArray input, int countOfControlBits) {
+        return calculateParityBits(ofAll(input.length), input, countOfControlBits);
     }
 
-    public static boolean[] calculateParityBits(Generator<Entry> positions, BitSet input, int countOfControlBits) {
-        boolean[] controlBits = new boolean[countOfControlBits];
+    public static ShortBitArray calculateParityBits(Generator<Entry> positions, BitArray input, int countOfControlBits) {
+        ShortBitArray controlBits = new ShortBitArray(0, countOfControlBits);
         positions.forEach(
                 e -> {
-                    for (int i = 0; i < controlBits.length; i++) {
-                        controlBits[i] ^= ((((e.actual + 1) >> i) & 1) != 0) & input.get(e.count);
+                    for (int i = 0; i < controlBits.length(); i++) {
+                        boolean toUpdate = BitsUtils.getIthBit(e.value + 1, i) & input.get(e.index);
+                        controlBits.update(i, (b) -> b ^ toUpdate);
                     }
                 }
         );

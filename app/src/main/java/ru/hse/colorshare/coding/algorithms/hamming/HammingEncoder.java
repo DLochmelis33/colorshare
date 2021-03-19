@@ -2,9 +2,10 @@ package ru.hse.colorshare.coding.algorithms.hamming;
 
 import androidx.annotation.NonNull;
 
-import ru.hse.colorshare.coding.BitArray;
+import ru.hse.colorshare.coding.dto.BitArray;
 import ru.hse.colorshare.coding.CodingTag;
 import ru.hse.colorshare.coding.Encoder;
+import ru.hse.colorshare.coding.dto.ShortBitArray;
 
 public class HammingEncoder implements Encoder {
     @NonNull
@@ -14,16 +15,15 @@ public class HammingEncoder implements Encoder {
     }
 
     @NonNull
-    @Override
     public BitArray encode(@NonNull BitArray input) {
-        int sourceFrameSize = input.length, controlBits = HammingUtils.calculateControlBits(sourceFrameSize);
-        boolean[] control = HammingUtils.calculateControlBits(input.data, controlBits);
-        BitArray resulting = new BitArray(sourceFrameSize + controlBits);
-        HammingUtils.ofNonControl(sourceFrameSize).forEach(
-                e -> resulting.data.set(e.actual, input.data.get(e.count))
+        CodingProperties properties = CodingProperties.ofSourceSize(input.length);
+        ShortBitArray control = HammingUtils.calculateControlBits(input, properties.controlBits);
+        BitArray resulting = new BitArray(properties.sourceSize + properties.controlBits);
+        HammingUtils.ofNonControl(properties.sourceSize).forEach(
+                e -> resulting.set(e.value, input.get(e.index))
         );
-        HammingUtils.ofControl(controlBits).forEach(
-                e -> resulting.data.set(e.actual, control[e.count])
+        HammingUtils.ofControl(properties.controlBits).forEach(
+                e -> resulting.set(e.value, control.get(e.index))
         );
         return resulting;
     }
