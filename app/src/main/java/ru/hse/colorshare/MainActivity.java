@@ -28,7 +28,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int PICK_FILE_REQUEST = 2;
     private static final int TRANSMIT_FILE_REQUEST = 3;
-    private static final String LOG_TAG = "ColorShareLogTag";
+    private static final String LOG_TAG = "ColorShare:main";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
         }
         Intent intent = new Intent(this, TransmitterActivity.class);
         intent.putExtra("fileToSendUri", fileToSendUri);
+        intent.putExtra("fileToSendSize", fileToSendSize);
         startActivityForResult(intent, TRANSMIT_FILE_REQUEST);
     }
 
@@ -113,8 +114,9 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case TRANSMIT_FILE_REQUEST:
                 if (resultCode == TransmitterActivity.RESULT_FAILED) {
-                    Toast.makeText(getApplicationContext(), "File sending failed, try again", Toast.LENGTH_SHORT).show();
-                    break;
+                    Toast.makeText(getApplicationContext(), "File sending failed, try again", Toast.LENGTH_LONG).show();
+                } else if (resultCode == TransmitterActivity.RESULT_SUCCESS) {
+                    Toast.makeText(getApplicationContext(), "File was successfully sent!", Toast.LENGTH_LONG).show();
                 }
                 break;
         }
