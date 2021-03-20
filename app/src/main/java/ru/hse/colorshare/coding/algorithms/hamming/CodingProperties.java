@@ -1,5 +1,10 @@
 package ru.hse.colorshare.coding.algorithms.hamming;
 
+/*
+    To implement hamming algorithm, one needs to calculate count of control bits, depending on length of input.
+    This class implement logic of calculation count of control bits using length of source fragment, or output fragment
+ */
+
 public class CodingProperties {
     public int sourceSize, controlBits;
 

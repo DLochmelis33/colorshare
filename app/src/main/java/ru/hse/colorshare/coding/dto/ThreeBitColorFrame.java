@@ -10,9 +10,13 @@ import java.util.Map;
 
 import ru.hse.colorshare.util.BitsUtils;
 
+/*
+    Implementation of DataFrame. One color per three bits. I guess two or four bit per color better. We will discuss it in future
+ */
+
 public final class ThreeBitColorFrame implements DataFrame {
 
-    public static final class ThreeBitUnit implements DataFrame.Unit{
+    public static final class ThreeBitUnit implements DataFrame.Unit {
         private final int color;
         private final int bits;
 
@@ -85,7 +89,7 @@ public final class ThreeBitColorFrame implements DataFrame {
         }
         return new ThreeBitColorFrame(units);
     }
-    
+
     private static Unit interpretLastBits(BitArray array) {
         if (array.length % UNIT_BITS_COUNT == 0) {
             return unitOfBits(0);

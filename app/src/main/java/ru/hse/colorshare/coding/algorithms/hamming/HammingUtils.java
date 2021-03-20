@@ -8,6 +8,11 @@ import ru.hse.colorshare.util.Generator;
 import ru.hse.colorshare.util.LimitGenerator;
 import ru.hse.colorshare.util.Supplier;
 
+/*
+    https://en.wikipedia.org/wiki/Hamming_code
+    "Hamming codes" tab
+ */
+
 public class HammingUtils {
 
     public static class Entry {
