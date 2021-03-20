@@ -36,6 +36,9 @@ public class TransmitterActivity extends AppCompatActivity {
     private Reader reader;
     private long fileToSendSize;
 
+    private TransmissionParams params;
+    private Generator generator;
+
     public static final int RESULT_FAILED = 3;
     public static final int RESULT_SUCCESS = 4;
     private static final String LOG_TAG = "ColorShare:transmitter";
@@ -96,9 +99,6 @@ public class TransmitterActivity extends AppCompatActivity {
     private class DrawView extends SurfaceView implements SurfaceHolder.Callback {
 
         private DrawThread drawThread;
-        private TransmissionParams params;
-        private Generator generator;
-        // TODO: save transmission state between DrawView destroy
 
         public DrawView(Context context) {
             super(context);
@@ -117,8 +117,12 @@ public class TransmitterActivity extends AppCompatActivity {
 
             // in future this methods may need to communicate with receiver,
             // draw something on screen
-            params = getTransmissionParams();
-            generator = getUnitGenerator();
+            if (params == null) {
+                params = getTransmissionParams();
+            }
+            if (generator == null) {
+                generator = getUnitGenerator();
+            }
             Log.d(LOG_TAG, "Transmissions params: " + params.toString());
             Log.d(LOG_TAG, "Generator params: frame size = " + generator.getFrameSize() + ", total number of frames = " + generator.getFramesNumber());
 
@@ -217,22 +221,20 @@ public class TransmitterActivity extends AppCompatActivity {
                             surfaceHolderWeakRef.get().unlockCanvasAndPost(canvas);
                         }
                     }
-                    boolean response;
-                    try {
-                        response = waitForReceiverResponse();
-                    } catch (InterruptedException exc) {
-                        generator.setDataFrameSuccessfullySent(false);
-                        continue;
-                    }
+                    boolean response = waitForReceiverResponse();
                     Log.d(LOG_TAG, "data frame #" + generator.getFrameIndex() +
                             " was successfully sent = " + response);
                     generator.setDataFrameSuccessfullySent(response);
                 }
             }
 
-            private boolean waitForReceiverResponse() throws InterruptedException {
+            private boolean waitForReceiverResponse() {
                 // currently is mock
-                TimeUnit.SECONDS.sleep(2);
+                try {
+                    TimeUnit.SECONDS.sleep(2);
+                } catch (InterruptedException exc) {
+                    return false;
+                }
                 return true;
             }
         }
