@@ -19,12 +19,6 @@ import android.view.Menu;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.Objects;
-
 public class MainActivity extends AppCompatActivity {
 
     private TextView fileToSendTextView;
@@ -33,6 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private long fileToSendSize;
 
     private static final int PICK_FILE_REQUEST = 2;
+    private static final int TRANSMIT_FILE_REQUEST = 3;
     private static final String LOG_TAG = "ColorShareLogTag";
 
     @Override
@@ -64,15 +59,9 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(getApplicationContext(), "Select a file", Toast.LENGTH_SHORT).show();
             return;
         }
-        Toast.makeText(getApplicationContext(), "Start sending...", Toast.LENGTH_SHORT).show();
-        // work with file
-//        try (InputStream inputStream =
-//                     getContentResolver().openInputStream(uri); BufferedReader reader = new BufferedReader(
-//                new InputStreamReader(Objects.requireNonNull(inputStream)))) {
-//            // read from input stream
-//        } catch (IOException exc) {
-//            Toast.makeText(getApplicationContext(), "File reading failed, try again", Toast.LENGTH_SHORT).show();
-//        }
+        Intent intent = new Intent(this, TransmitterActivity.class);
+        intent.putExtra("fileToSendUri", fileToSendUri);
+        startActivityForResult(intent, TRANSMIT_FILE_REQUEST);
     }
 
     public void onClickTest(View view) {
@@ -89,11 +78,12 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode,
                                     Intent resultData) {
         Log.d(LOG_TAG, "requestCode = " + requestCode + ", resultCode = " + resultCode);
-        if (resultCode != Activity.RESULT_OK) {
-            return;
-        }
+
         switch (requestCode) {
             case PICK_FILE_REQUEST:
+                if (resultCode != Activity.RESULT_OK) {
+                    return;
+                }
                 if (resultData == null) {
                     Toast.makeText(getApplicationContext(), "File selection failed, try again", Toast.LENGTH_SHORT).show();
                     break;
@@ -120,6 +110,12 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(LOG_TAG, "File info: " + "name = " + fileToSendName + ", size = " + fileToSendSize);
 
                 fileToSendTextView.setText(fileToSendName);
+                break;
+            case TRANSMIT_FILE_REQUEST:
+                if (resultCode == TransmitterActivity.RESULT_FAILED) {
+                    Toast.makeText(getApplicationContext(), "File sending failed, try again", Toast.LENGTH_SHORT).show();
+                    break;
+                }
                 break;
         }
         super.onActivityResult(requestCode, resultCode, resultData);
