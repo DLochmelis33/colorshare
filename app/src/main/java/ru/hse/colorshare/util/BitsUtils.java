@@ -28,4 +28,15 @@ public class BitsUtils {
         }
         return value;
     }
+
+    public static int fromByte(byte b, int offset, int length) {
+        assert offset >= 0 && length >= 0;
+        assert offset + length < Byte.SIZE;
+
+        int value = 0;
+        for (int i = 0; i < length; i++) {
+            value += getIthBit(b, offset + i) ? (1 << i) : 0;
+        }
+        return value;
+    }
 }

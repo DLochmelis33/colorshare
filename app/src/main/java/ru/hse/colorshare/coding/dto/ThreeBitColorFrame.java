@@ -16,23 +16,9 @@ import ru.hse.colorshare.util.BitsUtils;
 
 public final class ThreeBitColorFrame implements DataFrame {
 
-    public static final class ThreeBitUnit implements DataFrame.Unit {
-        private final int color;
-        private final int bits;
-
-        private ThreeBitUnit(int color, int bits) {
-            this.color = color;
-            this.bits = bits;
-        }
-
-        @Override
-        public int getColor() {
-            return color;
-        }
-
-        @Override
-        public int getEncodedValue() {
-            return bits;
+    public static final class ThreeBitUnit extends AbstractUnit {
+        public ThreeBitUnit(int color, int encodedValue) {
+            super(color, encodedValue);
         }
     }
 
@@ -53,67 +39,62 @@ public final class ThreeBitColorFrame implements DataFrame {
                 new ThreeBitUnit(Color.MAGENTA, 0b110),
                 new ThreeBitUnit(Color.GRAY, 0b111));
         for (ThreeBitUnit unit : ALL_THREE_BIT_UNITS) {
-            FROM_COLORS.put(unit.color, unit);
-            FROM_BITS.put(unit.bits, unit);
+            FROM_COLORS.put(unit.getColor(), unit);
+            FROM_BITS.put(unit.getEncodedValue(), unit);
         }
     }
 
-    public static ThreeBitUnit unitOfColor(Integer color) {
+    private static ThreeBitUnit unitOfColor(Integer color) {
         assert FROM_COLORS.containsKey(color);
         return FROM_COLORS.get(color);
     }
 
-    public static ThreeBitUnit unitOfColor(int color) {
+    private static ThreeBitUnit unitOfColor(int color) {
         assert FROM_COLORS.containsKey(color);
         return FROM_COLORS.get(color);
     }
 
-    public static ThreeBitUnit unitOfBits(int value) {
+    private static ThreeBitUnit unitOfBits(int value) {
         assert 0 <= value && value < 8;
         return FROM_BITS.get(value);
     }
 
 
     private final List<DataFrame.Unit> units;
+    private final long checksum;
 
     @Override
     public List<Unit> getUnits() {
         return units;
     }
 
-
-    public static ThreeBitColorFrame ofColors(List<Integer> colors) {
-        List<DataFrame.Unit> units = new ArrayList<>(colors.size());
-        for (Integer color : colors) {
-            units.add(unitOfColor(color));
-        }
-        return new ThreeBitColorFrame(units);
+    @Override
+    public long getChecksum() {
+        return checksum;
     }
 
-    private static Unit interpretLastBits(BitArray array) {
-        if (array.length % UNIT_BITS_COUNT == 0) {
-            return unitOfBits(0);
-        }
-        if (array.length % UNIT_BITS_COUNT == 1) {
-            return array.get(array.length - 1) ? unitOfBits(0b110) : unitOfBits(0b100);
-        }
-        boolean last = array.get(array.length - 1);
-        boolean prevLast = array.get(array.length - 2);
-        return unitOfBits((prevLast ? 1 << 2 : 0) + (last ? 1 << 1 : 0) + 1);
-    }
-
-    public static ThreeBitColorFrame ofBits(BitArray array) {
-        List<Unit> units = new ArrayList<>(array.length / 3 + 1);
-        for (int i = 0; i < array.length; i += UNIT_BITS_COUNT) {
+    public static DataFrame valueOf(byte[] bytes, int offset, int length, long checksum) {
+        List<Unit> units = new ArrayList<>();
+        for (int inArray = offset; inArray < length; inArray++) {
+            int inByte = 0;
+            for (; inByte + UNIT_BITS_COUNT < Byte.SIZE; inByte += UNIT_BITS_COUNT) {
+                units.add(unitOfBits(BitsUtils.fromByte(bytes[inArray], inByte, UNIT_BITS_COUNT)));
+            }
             units.add(unitOfBits(
-                    BitsUtils.fromBitArray(array, i, UNIT_BITS_COUNT)
+                    BitsUtils.fromByte(bytes[inArray], inByte, Byte.SIZE - inByte) << (UNIT_BITS_COUNT - Byte.SIZE + inByte)
             ));
         }
-        units.add(interpretLastBits(array));
-        return new ThreeBitColorFrame(units);
+        return new ThreeBitColorFrame(units, checksum);
     }
 
-    private ThreeBitColorFrame(List<Unit> units) {
-        this.units = units;
+    public static int estimateByteSize(int frameSize) {
+        int unitsPerByte = (Byte.SIZE + UNIT_BITS_COUNT - 1) / UNIT_BITS_COUNT;
+        return frameSize / unitsPerByte;
     }
+
+    private ThreeBitColorFrame(List<Unit> units, long checksum) {
+        this.units = units;
+        this.checksum = checksum;
+    }
+
 }
