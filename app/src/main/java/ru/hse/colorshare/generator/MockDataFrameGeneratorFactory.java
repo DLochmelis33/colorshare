@@ -11,7 +11,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Objects;
 
-import ru.hse.colorshare.TransmissionParams;
+import ru.hse.colorshare.transmitter.TransmissionParams;
 
 public class MockDataFrameGeneratorFactory {
     private final Reader reader;
@@ -39,7 +39,7 @@ public class MockDataFrameGeneratorFactory {
     public DataFrameGenerator getDataFrameGenerator() {
         if (generator == null) {
             generatorId++;
-            generator = new MockDataFrameGenerator(generatorId, params.getCols() * params.getRows(), 5);
+            generator = new MockDataFrameGenerator(generatorId, params.getColorFrameSize(), 10);
         }
         return generator;
     }

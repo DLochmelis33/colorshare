@@ -8,7 +8,7 @@ import java.util.Random;
 
 public final class MockDataFrameGenerator implements DataFrameGenerator {
     private final int id;
-    private final int frameSize;
+    private final int frameSize; // in units
     private final int framesNumber;
     private final Random random;
     private int currentFrameIndex;

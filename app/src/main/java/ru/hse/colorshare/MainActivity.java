@@ -22,6 +22,8 @@ import android.widget.Toast;
 import java.util.HashMap;
 import java.util.Map;
 
+import ru.hse.colorshare.transmitter.TransmitterActivity;
+
 public class MainActivity extends AppCompatActivity {
 
     private TextView fileToSendTextView;
@@ -109,11 +111,16 @@ public class MainActivity extends AppCompatActivity {
             case TRANSMIT_FILE:
                 TransmissionResultCode resultCode = TransmissionResultCode.valueOf(resultCodeValue);
                 switch (resultCode) {
-                    case FAILED:
-                        Toast.makeText(getApplicationContext(), "File sending failed, try again", Toast.LENGTH_LONG).show();
-                        break;
-                    case SUCCESS:
+                    case SUCCEED:
                         Toast.makeText(getApplicationContext(), "File was successfully sent!", Toast.LENGTH_LONG).show();
+                        break;
+                    case CANCELED:
+                        break;
+                    case FAILED_TO_READ_FILE:
+                        Toast.makeText(getApplicationContext(), "File sending failed: failed to read file, try again", Toast.LENGTH_LONG).show();
+                        break;
+                    case FAILED_TO_GET_TRANSMISSION_PARAMS:
+                        Toast.makeText(getApplicationContext(), "File sending failed: bad device params", Toast.LENGTH_LONG).show();
                         break;
                 }
         }
@@ -171,8 +178,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public enum TransmissionResultCode {
-        FAILED(3),
-        SUCCESS(4);
+        SUCCEED(Activity.RESULT_OK),
+        CANCELED(Activity.RESULT_CANCELED),
+        FAILED_TO_READ_FILE(4),
+        FAILED_TO_GET_TRANSMISSION_PARAMS(5);
 
         public final int value;
         private static final Map<Integer, TransmissionResultCode> map = new HashMap<>();

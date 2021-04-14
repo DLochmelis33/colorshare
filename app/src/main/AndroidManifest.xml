@@ -9,7 +9,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Colorshare">
-        <activity android:name=".TransmitterActivity"></activity>
+        <activity android:name=".transmitter.TransmitterActivity" />
         <activity
             android:name=".MainActivity"
             android:label="@string/app_name"
