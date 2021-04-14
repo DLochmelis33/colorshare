@@ -57,7 +57,7 @@
                 android:ellipsize="end"
                 android:maxWidth="180dp"
                 android:singleLine="true"
-                android:text="@string/file_to_send"
+                android:text="@string/default_file_to_send_message"
                 app:layout_constraintBottom_toBottomOf="@+id/selectFileButton"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintHorizontal_bias="0.5"

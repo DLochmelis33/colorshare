@@ -34,32 +34,27 @@ import java.util.concurrent.TimeUnit;
 public class TransmitterActivity extends AppCompatActivity {
 
     private Reader reader;
-    private long fileToSendSize;
 
     private TransmissionParams params;
     private Generator generator;
 
-    public static final int RESULT_FAILED = 3;
-    public static final int RESULT_SUCCESS = 4;
     private static final String LOG_TAG = "ColorShare:transmitter";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        Uri fileToSendUri = Uri.parse(getIntent().getStringExtra("fileToSendUri"));
+        Uri fileToSendUri = getIntent().getParcelableExtra("fileToSendUri");
         try {
             InputStream inputStream =
                     getContentResolver().openInputStream(fileToSendUri);
             Objects.requireNonNull(inputStream);
             reader = new BufferedReader(new InputStreamReader(inputStream));
         } catch (IOException | RuntimeException exc) {
-            setResult(RESULT_FAILED, new Intent());
+            setResult(MainActivity.TransmissionResultCode.FAILED.value, new Intent());
             finish();
         }
-        fileToSendSize = getIntent().getLongExtra("fileToSendSize", 0);
-        Log.d(LOG_TAG, "received intent: " + "uri = " + fileToSendUri.toString() +
-                ", fileToSendSize = " + fileToSendSize);
+        Log.d(LOG_TAG, "received intent: " + "uri = " + fileToSendUri);
 
         getWindow().getDecorView().setOnSystemUiVisibilityChangeListener
                 (visibility -> {
@@ -165,7 +160,7 @@ public class TransmitterActivity extends AppCompatActivity {
                 params = getTransmissionParams();
             }
             int frameSize = params.getCols() * params.getRows(); // in units
-            return new Generator(frameSize, (int) (fileToSendSize * 8 / frameSize) + 10);
+            return new Generator(frameSize, 100 * 8 / frameSize + 10);
         }
 
         private class DrawThread extends Thread {
@@ -192,7 +187,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     try {
                         List<Generator.Unit> colors = generator.getDataFrame();
                         if (colors == null) {
-                            setResult(RESULT_SUCCESS, new Intent());
+                            setResult(MainActivity.TransmissionResultCode.SUCCESS.value, new Intent());
                             finish();
                             return;
                         }
