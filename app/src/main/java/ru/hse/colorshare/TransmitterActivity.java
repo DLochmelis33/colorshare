@@ -1,6 +1,5 @@
 package ru.hse.colorshare;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.Activity;
@@ -19,24 +18,19 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 
-import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
+
+import ru.hse.colorshare.generator.DataFrameGenerator;
+import ru.hse.colorshare.generator.MockDataFrameGeneratorFactory;
 
 public class TransmitterActivity extends AppCompatActivity {
 
-    private Reader reader;
-
     private TransmissionParams params;
-    private Generator generator;
+    private MockDataFrameGeneratorFactory generatorFactory;
 
     private static final String LOG_TAG = "ColorShare:transmitter";
 
@@ -45,16 +39,14 @@ public class TransmitterActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         Uri fileToSendUri = getIntent().getParcelableExtra("fileToSendUri");
+        Log.d(LOG_TAG, "received intent: " + "uri = " + fileToSendUri);
+
         try {
-            InputStream inputStream =
-                    getContentResolver().openInputStream(fileToSendUri);
-            Objects.requireNonNull(inputStream);
-            reader = new BufferedReader(new InputStreamReader(inputStream));
-        } catch (IOException | RuntimeException exc) {
+            generatorFactory = new MockDataFrameGeneratorFactory(fileToSendUri, this);
+        } catch (FileNotFoundException exc) {
             setResult(MainActivity.TransmissionResultCode.FAILED.value, new Intent());
             finish();
         }
-        Log.d(LOG_TAG, "received intent: " + "uri = " + fileToSendUri);
 
         getWindow().getDecorView().setOnSystemUiVisibilityChangeListener
                 (visibility -> {
@@ -83,8 +75,8 @@ public class TransmitterActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         try {
-            if (reader != null) {
-                reader.close();
+            if (generatorFactory != null) {
+                generatorFactory.finish();
             }
         } catch (IOException exc) {
             throw new RuntimeException("Transmission file failed to close", exc);
@@ -115,11 +107,8 @@ public class TransmitterActivity extends AppCompatActivity {
             if (params == null) {
                 params = getTransmissionParams();
             }
-            if (generator == null) {
-                generator = getUnitGenerator();
-            }
+            generatorFactory.setParams(params);
             Log.d(LOG_TAG, "Transmissions params: " + params.toString());
-            Log.d(LOG_TAG, "Generator params: frame size = " + generator.getFrameSize() + ", total number of frames = " + generator.getFramesNumber());
 
             // start transmission
             drawThread = new DrawThread(getHolder());
@@ -153,16 +142,6 @@ public class TransmitterActivity extends AppCompatActivity {
             return new TransmissionParams(unitRect, rows, cols);
         }
 
-        private Generator getUnitGenerator() {
-            // TODO: get the most appropriate unit generator
-            // currently mock generator is used
-            if (params == null) {
-                params = getTransmissionParams();
-            }
-            int frameSize = params.getCols() * params.getRows(); // in units
-            return new Generator(frameSize, 100 * 8 / frameSize + 10);
-        }
-
         private class DrawThread extends Thread {
 
             private boolean running = false;
@@ -184,8 +163,10 @@ public class TransmitterActivity extends AppCompatActivity {
                 Canvas canvas;
                 while (running) {
                     canvas = null;
+                    DataFrameGenerator generator = generatorFactory.getDataFrameGenerator();
+                    Log.d(LOG_TAG, "Generator info: " + generator.getInfo());
                     try {
-                        List<Generator.Unit> colors = generator.getDataFrame();
+                        List<Integer> colors = generator.getNextDataFrame();
                         if (colors == null) {
                             setResult(MainActivity.TransmissionResultCode.SUCCESS.value, new Intent());
                             finish();
@@ -202,7 +183,7 @@ public class TransmitterActivity extends AppCompatActivity {
                             for (int i = 0; i < params.getRows(); ++i) {
                                 canvas.save();
                                 for (int j = 0; j < params.getCols(); ++j) {
-                                    paint.setColor(colors.get(i * params.getCols() + j).getColor());
+                                    paint.setColor(colors.get(i * params.getCols() + j));
                                     canvas.drawRect(unitRect, paint);
                                     canvas.translate(unitRect.width(), 0);
                                 }
@@ -219,7 +200,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     boolean response = waitForReceiverResponse();
                     Log.d(LOG_TAG, "data frame #" + generator.getFrameIndex() +
                             " was successfully sent = " + response);
-                    generator.setDataFrameSuccessfullySent(response);
+                    generator.setSuccess(response);
                 }
             }
 
@@ -231,97 +212,6 @@ public class TransmitterActivity extends AppCompatActivity {
                     return false;
                 }
                 return true;
-            }
-        }
-    }
-
-    private static final class TransmissionParams {
-        private final RectF unitRect;
-        private final int rows;
-        private final int cols;
-
-        public TransmissionParams(RectF unitRect, int rows, int cols) {
-            this.unitRect = unitRect;
-            this.rows = rows;
-            this.cols = cols;
-        }
-
-        public RectF getUnitRect() {
-            return unitRect;
-        }
-
-        public int getCols() {
-            return cols;
-        }
-
-        public int getRows() {
-            return rows;
-        }
-
-        @Override
-        public @NonNull
-        String toString() {
-            return "unit rect: height = " + unitRect.height() +
-                    ", width = " + unitRect.width() +
-                    "; rows = " + rows + "; cols = " + cols;
-        }
-    }
-
-    // mock generator of colors to transmit
-    private static final class Generator {
-        private final int frameSize;
-        private final int framesNumber;
-        private final Random random;
-        private int currentFrameIndex;
-
-        public Generator(int frameSize, int framesNumber) {
-            this.frameSize = frameSize;
-            this.framesNumber = framesNumber;
-            random = new Random();
-            currentFrameIndex = 0;
-        }
-
-        public List<Unit> getDataFrame() {
-            if (currentFrameIndex == framesNumber) {
-                return null;
-            }
-            List<Unit> dataFrame = new ArrayList<>();
-            for (int i = 0; i < frameSize; ++i) {
-                dataFrame.add(new Unit(Color.rgb(
-                        random.nextInt(256),
-                        random.nextInt(256),
-                        random.nextInt(256))));
-            }
-            return dataFrame;
-        }
-
-        public void setDataFrameSuccessfullySent(boolean result) {
-            if (result) {
-                currentFrameIndex++;
-            }
-        }
-
-        public int getFrameIndex() {
-            return currentFrameIndex;
-        }
-
-        public int getFramesNumber() {
-            return framesNumber;
-        }
-
-        public int getFrameSize() {
-            return frameSize;
-        }
-
-        public static class Unit {
-            private final int color;
-
-            public Unit(int color) {
-                this.color = color;
-            }
-
-            public int getColor() {
-                return color;
             }
         }
     }
