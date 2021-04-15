@@ -1,5 +1,6 @@
 package ru.hse.colorshare.transmitter;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
@@ -29,14 +30,31 @@ import ru.hse.colorshare.generator.MockDataFrameGeneratorFactory;
 
 public class TransmitterActivity extends AppCompatActivity {
 
+    private TransmissionState state;
     private TransmissionParams params;
     private MockDataFrameGeneratorFactory generatorFactory;
+
+    private int screenOrientation;
 
     private static final String LOG_TAG = "ColorShare:transmitter";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if (savedInstanceState != null) {
+            state = TransmissionState.values()[savedInstanceState.getInt("state")];
+            Log.d(LOG_TAG, "restored state: " + state);
+        } else {
+            state = TransmissionState.INITIAL;
+        }
+        // cancel because of params loss
+        // TODO: support restoring = save TransmitterActivity fields via ViewModel
+        if (!state.equals(TransmissionState.INITIAL)) {
+            setResult(MainActivity.TransmissionResultCode.CANCELLED.value, new Intent());
+            finish();
+            return;
+        }
 
         Uri fileToSendUri = getIntent().getParcelableExtra("fileToSendUri");
         Log.d(LOG_TAG, "received intent: " + "uri = " + fileToSendUri);
@@ -48,6 +66,8 @@ public class TransmitterActivity extends AppCompatActivity {
             finish();
             return;
         }
+
+        screenOrientation = getResources().getConfiguration().orientation;
 
         getWindow().getDecorView().setOnSystemUiVisibilityChangeListener
                 (visibility -> {
@@ -84,6 +104,12 @@ public class TransmitterActivity extends AppCompatActivity {
         }
     }
 
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt("state", state.ordinal());
+        Log.d(LOG_TAG, "save state = " + state);
+    }
+
     private class DrawView extends SurfaceView implements SurfaceHolder.Callback {
 
         private DrawThread drawThread;
@@ -101,24 +127,28 @@ public class TransmitterActivity extends AppCompatActivity {
 
         @Override
         public void surfaceCreated(SurfaceHolder holder) {
-            Log.d(LOG_TAG, "DrawView created");
+            Log.d(LOG_TAG, "DrawView created, transmission state = " + state);
+            setRequestedOrientation(screenOrientation);
 
-            // in future this methods may need to communicate with receiver,
-            // draw something on screen
-            if (params == null) {
+            if (state.equals(TransmissionState.INITIAL)) {
                 try {
                     params = getTransmissionParams();
                 } catch (IllegalStateException exc) {
                     Log.d(LOG_TAG, "Getting transmission params failed: " + exc.getMessage());
+                    state = TransmissionState.FAILED;
                     setResult(MainActivity.TransmissionResultCode.FAILED_TO_GET_TRANSMISSION_PARAMS.value, new Intent());
                     finish();
                     return;
                 }
+                generatorFactory.setParams(params);
             }
-            generatorFactory.setParams(params);
+            if (params == null) {
+                throw new IllegalStateException("transmission params remain null in state " + state);
+            }
             Log.d(LOG_TAG, "Transmissions params: " + params.toString());
 
             // start transmission
+            state = TransmissionState.STARTED;
             drawThread = new DrawThread(getHolder());
             drawThread.setRunning(true);
             drawThread.start();
@@ -137,13 +167,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     }
                 }
             }
-            try {
-                generatorFactory.finish();
-            } catch (IOException exc) {
-                throw new RuntimeException(exc);
-            }
             Log.d(LOG_TAG, "DrawView destroyed");
-            setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
         }
 
         private TransmissionParams getTransmissionParams() throws IllegalStateException {
@@ -222,6 +246,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     try {
                         List<Integer> colors = generator.getNextDataFrame();
                         if (colors == null) {
+                            state = TransmissionState.FINISHED;
                             setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
                             finish();
                             return;
@@ -302,5 +327,9 @@ public class TransmitterActivity extends AppCompatActivity {
                 return true;
             }
         }
+    }
+
+    private enum TransmissionState {
+        INITIAL, STARTED, FINISHED, FAILED
     }
 }

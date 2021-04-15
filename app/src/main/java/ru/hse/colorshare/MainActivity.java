@@ -78,8 +78,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCodeValue, int resultCodeValue,
                                     Intent resultData) {
-        Log.d(LOG_TAG, "requestCodeValue = " + requestCodeValue + ", resultCodeValue = " + resultCodeValue);
+        Log.d(LOG_TAG, "requestCodeValue = " + requestCodeValue + "; resultCodeValue = " + resultCodeValue);
         RequestCode requestCode = RequestCode.valueOf(requestCodeValue);
+        Log.d(LOG_TAG, "requestCode = " + requestCode);
         switch (requestCode) {
             case PICK_FILE:
                 if (resultCodeValue != Activity.RESULT_OK) {
@@ -110,11 +111,12 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case TRANSMIT_FILE:
                 TransmissionResultCode resultCode = TransmissionResultCode.valueOf(resultCodeValue);
+                Log.d(LOG_TAG, "resultCode = " + resultCode);
                 switch (resultCode) {
                     case SUCCEED:
                         Toast.makeText(getApplicationContext(), "File was successfully sent!", Toast.LENGTH_LONG).show();
                         break;
-                    case CANCELED:
+                    case CANCELLED:
                         break;
                     case FAILED_TO_READ_FILE:
                         Toast.makeText(getApplicationContext(), "File sending failed: failed to read file, try again", Toast.LENGTH_LONG).show();
@@ -179,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
 
     public enum TransmissionResultCode {
         SUCCEED(Activity.RESULT_OK),
-        CANCELED(Activity.RESULT_CANCELED),
+        CANCELLED(Activity.RESULT_CANCELED),
         FAILED_TO_READ_FILE(4),
         FAILED_TO_GET_TRANSMISSION_PARAMS(5);
 

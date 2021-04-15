@@ -36,7 +36,10 @@ public class MockDataFrameGeneratorFactory {
         this.params = params;
     }
 
-    public DataFrameGenerator getDataFrameGenerator() {
+    public DataFrameGenerator getDataFrameGenerator() throws IllegalArgumentException {
+        if (params == null) {
+            throw new IllegalStateException("params are not set");
+        }
         if (generator == null) {
             generatorId++;
             generator = new MockDataFrameGenerator(generatorId, params.getColorFrameSize(), 10);
