@@ -28,16 +28,18 @@ import androidx.core.app.ActivityCompat;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class CameraService {
-    private static final String logTag = "cameraServiceLog";
+
+    private static final String TAG = "cameraServiceLog";
 
     public final CameraManager manager;
     private CameraDevice cameraDevice;
     private String cameraId;
-    private SurfaceTexture previewSurfaceTexture;
-    private CaptureRequest.Builder cameraRequestBuilder;
+    private CaptureRequest.Builder captureRequestBuilder;
 
     private final Activity startingActivity;
     private final TextureView previewView;
@@ -47,14 +49,7 @@ public class CameraService {
         return isCameraOpen.get();
     }
 
-    /**
-     * Max preview width that is guaranteed by Camera2 API
-     */
     private static final int MAX_PREVIEW_WIDTH = 1920;
-
-    /**
-     * Max preview height that is guaranteed by Camera2 API
-     */
     private static final int MAX_PREVIEW_HEIGHT = 1080;
 
     private final AtomicBoolean isCameraOpen;
@@ -62,11 +57,11 @@ public class CameraService {
     private Size calculateMaxThroughputSize(StreamConfigurationMap config) {
         Size result = null;
         double resultSizeEvaluation = 0;
-        Size[] sizes = config.getOutputSizes(previewSurfaceTexture.getClass());
+        Size[] sizes = config.getOutputSizes(/*previewView.getSurfaceTexture().getClass()*/ ImageFormat.JPEG);
         assert sizes != null;
-        Log.d(logTag, Arrays.toString(sizes));
+        Log.d(TAG, Arrays.toString(sizes));
         for (Size size : sizes) {
-            double maxTheoreticalFps = 1e9 / config.getOutputMinFrameDuration(previewSurfaceTexture.getClass(), size);
+            double maxTheoreticalFps = 1e9 / config.getOutputMinFrameDuration(previewView.getSurfaceTexture().getClass(), size);
             double sizeEvaluation = size.getHeight() * size.getWidth() * maxTheoreticalFps;
             if (result == null || resultSizeEvaluation < sizeEvaluation) {
                 result = size;
@@ -74,7 +69,43 @@ public class CameraService {
             }
         }
         assert result != null; // ! studio told to
-        Log.d(logTag, "chosen size: " + result.getWidth() + "x" + result.getHeight() + " with eval=" + resultSizeEvaluation);
+        Log.d(TAG, "chosen size: " + result.getWidth() + "x" + result.getHeight() + " with eval=" + resultSizeEvaluation);
+        return result;
+    }
+
+    // modified googlearchive way to choose size
+    private static Size chooseOptimalSizeMod(Size[] choices, int textureViewWidth,
+                                             int textureViewHeight, Size aspectRatio) {
+        Size result;
+
+        // Collect the supported resolutions that are at least as big as the preview Surface
+        List<Size> bigEnough = new ArrayList<>();
+        // Collect the supported resolutions that are smaller than the preview Surface
+        List<Size> notBigEnough = new ArrayList<>();
+        int w = aspectRatio.getWidth();
+        int h = aspectRatio.getHeight();
+        for (Size option : choices) {
+            if (option.getHeight() * w == option.getWidth() * h) {
+                if (option.getWidth() >= textureViewWidth && option.getHeight() >= textureViewHeight) {
+                    bigEnough.add(option);
+                } else {
+                    notBigEnough.add(option);
+                }
+            }
+        }
+
+        // Pick the smallest of those big enough. If there is no one big enough, pick the
+        // largest of those not big enough.
+        if (bigEnough.size() > 0) {
+            result = Collections.min(bigEnough, (s1, s2) -> s1.getWidth() * s1.getHeight() - s2.getWidth() * s2.getHeight());
+        } else if (notBigEnough.size() > 0) {
+            result = Collections.max(notBigEnough, (s1, s2) -> s1.getWidth() * s1.getHeight() - s2.getWidth() * s2.getHeight());
+        } else {
+            throw new IllegalStateException("couldn't find any suitable preview size");
+        }
+        Log.d(TAG, "big enough = " + Arrays.toString(bigEnough.toArray()));
+        Log.d(TAG, "not big enough = " + Arrays.toString(notBigEnough.toArray()));
+        Log.d(TAG, "chosen size = " + result);
         return result;
     }
 
@@ -86,29 +117,43 @@ public class CameraService {
             try {
                 // get char-cs for used camera
                 CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+                int sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
                 StreamConfigurationMap configurations = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 
-                if (!StreamConfigurationMap.isOutputSupportedFor(previewSurfaceTexture.getClass())) {
+                if (!StreamConfigurationMap.isOutputSupportedFor(previewView.getSurfaceTexture().getClass())) {
                     throw new IllegalArgumentException("camera cannot output to SurfaceTexture");
                 }
 
-                Size preferredSize = calculateMaxThroughputSize(configurations);
+                Size preferredSize = chooseOptimalSizeMod(configurations.getOutputSizes(SurfaceTexture.class),
+                        previewView.getWidth(), previewView.getHeight(),
+                        calculateMaxThroughputSize(configurations));
+
+                Log.d(TAG, "orientation=" + sensorOrientation);
+                if (sensorOrientation == 90 || sensorOrientation == 270) {
+                    // swap dimensions
+                    preferredSize = new Size(preferredSize.getHeight(), preferredSize.getWidth());
+                    Log.d(TAG, "swapped dimensions");
+                }
+
                 resizePreviewViewToRatio(preferredSize);
 
                 // create CaptureRequest
-                cameraRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD); // ! record vs preview?
-                Surface previewSurface = new Surface(previewSurfaceTexture);
-                cameraRequestBuilder.addTarget(previewSurface);
+                captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD); // ! record vs preview?
                 // set capture request flags
-                cameraRequestBuilder.set(CaptureRequest.JPEG_QUALITY, (byte) 97); // !
+                captureRequestBuilder.set(CaptureRequest.JPEG_QUALITY, (byte) 97); // !
 //                builder.set(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_OFF); // disable some post-processing related to edges of objects
-                cameraRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
-//                CaptureRequest request = builder.build();
+                captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
+                captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                        CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
 
-                // submit a capture request by creating a session
+                Surface previewSurface = new Surface(previewView.getSurfaceTexture());
+                previewView.getSurfaceTexture().setDefaultBufferSize(preferredSize.getWidth(), preferredSize.getHeight());
+                captureRequestBuilder.addTarget(previewSurface);
+
                 ArrayList<Surface> surfacesList = new ArrayList<>();
                 surfacesList.add(previewSurface);
 
+                // submit a capture request by creating a session
                 // ! deprecated (api 30), but no other option (api 23)
                 cameraDevice.createCaptureSession(surfacesList, stateCallback, null);
 
@@ -137,16 +182,15 @@ public class CameraService {
         public void onConfigured(CameraCaptureSession session) {
             try {
                 // "at the maximum rate possible"
-                session.setRepeatingRequest(cameraRequestBuilder.build(), new CameraCaptureSession.CaptureCallback() {
+                session.setRepeatingRequest(captureRequestBuilder.build(), new CameraCaptureSession.CaptureCallback() {
                     @Override
                     public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
-                        Log.d(logTag, "capture completed");
+//                        Log.d(logTag, "capture completed");
                         super.onCaptureCompleted(session, request, result);
                     }
 
                     @Override
                     public void onCaptureSequenceCompleted(@NonNull CameraCaptureSession session, int sequenceId, long frameNumber) {
-                        Log.d(logTag, "capture sequence completed");
                         super.onCaptureSequenceCompleted(session, sequenceId, frameNumber);
                     }
                 }, null);
@@ -163,42 +207,18 @@ public class CameraService {
         }
     };
 
-    private void resizePreviewViewToRatio(Size size) {
-        Rect screenSizeRect = new Rect();
-        startingActivity.getWindowManager().getDefaultDisplay().getRectSize(screenSizeRect);
-        double scaleByWidth = (double) screenSizeRect.width() / size.getWidth();
-        double scaleByHeight = (double) screenSizeRect.height() / size.getHeight();
-        if (scaleByWidth * size.getHeight() < screenSizeRect.height()) {
+    public void resizePreviewViewToRatio(Size size) {
+        int w = previewView.getWidth();
+        int h = previewView.getHeight();
+        double scaleByWidth = (double) w / size.getWidth();
+        double scaleByHeight = (double) h / size.getHeight();
+        if (scaleByWidth * size.getHeight() < h) {
             previewView.setLayoutParams(new FrameLayout.LayoutParams((int) (size.getWidth() * scaleByWidth), (int) (size.getHeight() * scaleByWidth)));
-        } else if (scaleByHeight * size.getWidth() < screenSizeRect.width()) {
+        } else if (scaleByHeight * size.getWidth() < w) {
             previewView.setLayoutParams(new FrameLayout.LayoutParams((int) (size.getWidth() * scaleByHeight), (int) (size.getHeight() * scaleByHeight)));
         } else {
             throw new AssertionError("unscalable size?");
         }
-    }
-
-    // ! copypasted from googlearchive demo camera app
-    private void configureTransform(Size preferredSize) {
-        int viewWidth = previewView.getWidth();
-        int viewHeight = previewView.getHeight();
-        int rotation = startingActivity.getWindowManager().getDefaultDisplay().getRotation();
-        Matrix matrix = new Matrix();
-        RectF viewRect = new RectF(0, 0, viewWidth, viewHeight);
-        RectF bufferRect = new RectF(0, 0, preferredSize.getHeight(), preferredSize.getWidth());
-        float centerX = viewRect.centerX();
-        float centerY = viewRect.centerY();
-        if (Surface.ROTATION_90 == rotation || Surface.ROTATION_270 == rotation) {
-            bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
-            matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
-            float scale = Math.max(
-                    (float) viewHeight / preferredSize.getHeight(),
-                    (float) viewWidth / preferredSize.getWidth());
-            matrix.postScale(scale, scale, centerX, centerY);
-            matrix.postRotate(90 * (rotation - 2), centerX, centerY);
-        } else if (Surface.ROTATION_180 == rotation) {
-            matrix.postRotate(180, centerX, centerY);
-        }
-        previewView.setTransform(matrix);
     }
 
     public CameraService(CameraManager manager, Activity startingActivity, TextureView previewView) {
@@ -208,15 +228,13 @@ public class CameraService {
         isCameraOpen = new AtomicBoolean(false);
 
         this.previewView = previewView;
-        previewSurfaceTexture = null;
 
         this.startingActivity = startingActivity;
         this.imageStreamHandler = ImageStreamHandler.getInstance();
     }
 
-    public void tryOpenCamera(String cameraId, SurfaceTexture previewTexture) {
+    public void tryOpenCamera(String cameraId) {
         closeCamera();
-        this.previewSurfaceTexture = previewTexture;
         try {
             if (ActivityCompat.checkSelfPermission(startingActivity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 throw new IllegalStateException("was camera permission revoked?");
@@ -235,7 +253,6 @@ public class CameraService {
             isCameraOpen.set(false);
             cameraDevice.close();
             cameraDevice = null;
-            previewSurfaceTexture = null;
             cameraId = null;
         }
     }

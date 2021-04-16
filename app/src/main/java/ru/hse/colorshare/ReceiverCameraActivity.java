@@ -14,8 +14,10 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
+import android.view.MotionEvent;
 import android.view.SurfaceView;
 import android.view.TextureView;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
@@ -50,7 +52,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         cameraTextureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
-                cameraService.tryOpenCamera(cameraId, surface);
+                cameraService.tryOpenCamera(cameraId);
             }
 
             @Override
@@ -60,6 +62,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             @Override
             public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
                 Log.d(logTag, "texture destroyed");
+                cameraService.closeCamera();
                 return false;
             }
 
@@ -114,4 +117,5 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             throw new RuntimeException("camera failure");
         }
     }
+
 }
