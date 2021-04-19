@@ -1,4 +1,4 @@
-package ru.hse.colorshare.coding.dto;
+package ru.hse.colorshare.coding.algorithms.hamming;
 
 import ru.hse.colorshare.util.BitsUtils;
 import ru.hse.colorshare.util.TransformBoolean;

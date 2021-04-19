@@ -1,36 +1,17 @@
 package ru.hse.colorshare.coding;
 
-import java.util.zip.Checksum;
+import android.content.Context;
+import android.net.Uri;
 
-import ru.hse.colorshare.coding.dto.ThreeBitColorFrame;
+import java.util.zip.CRC32;
 
 public final class DataFrameSupplierFactory {
-    DataFrameSupplier get(DataFrameCreationParameters parameters) {
-        byte[] bytes = new byte[]{1, 23, 100, 34};
-        return new ColorFrameSupplier(
-                bytes,
-                new Checksum() {
-                    @Override
-                    public void update(int b) {
 
-                    }
+    public DataFrameSupplier get(Uri sourceFile, Context context) {
+        return null;
+    }
 
-                    @Override
-                    public void update(byte[] b, int off, int len) {
-
-                    }
-
-                    @Override
-                    public long getValue() {
-                        return 0;
-                    }
-
-                    @Override
-                    public void reset() {
-
-                    }
-                },
-                ThreeBitColorFrame::valueOf,
-                ThreeBitColorFrame.estimateByteSize(parameters.getUnitsPerFrame()));
+    public DataFrameSupplier get(byte[] source, int colorsPerFrame) {
+        return new FromByteArrayDataFrameSupplier(source, new CRC32(), colorsPerFrame / 4);
     }
 }

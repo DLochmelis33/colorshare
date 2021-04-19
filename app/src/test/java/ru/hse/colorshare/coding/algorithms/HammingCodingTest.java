@@ -2,7 +2,6 @@ package ru.hse.colorshare.coding.algorithms;
 
 
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 
 
@@ -14,8 +13,7 @@ import ru.hse.colorshare.coding.Encoder;
 import ru.hse.colorshare.coding.algorithms.hamming.CodingProperties;
 import ru.hse.colorshare.coding.algorithms.hamming.HammingDecoder;
 import ru.hse.colorshare.coding.algorithms.hamming.HammingEncoder;
-import ru.hse.colorshare.coding.algorithms.hamming.HammingUtils;
-import ru.hse.colorshare.coding.dto.BitArray;
+import ru.hse.colorshare.coding.algorithms.hamming.BitArray;
 
 public class HammingCodingTest {
 

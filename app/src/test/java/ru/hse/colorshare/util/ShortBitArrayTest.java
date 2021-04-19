@@ -3,7 +3,7 @@ package ru.hse.colorshare.util;
 import org.junit.Assert;
 import org.junit.Test;
 
-import ru.hse.colorshare.coding.dto.ShortBitArray;
+import ru.hse.colorshare.coding.algorithms.hamming.ShortBitArray;
 
 public class ShortBitArrayTest {
     @Test

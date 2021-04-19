@@ -1,6 +1,6 @@
 package ru.hse.colorshare.util;
 
-import ru.hse.colorshare.coding.dto.BitArray;
+import ru.hse.colorshare.coding.algorithms.hamming.BitArray;
 
 public class BitsUtils {
 

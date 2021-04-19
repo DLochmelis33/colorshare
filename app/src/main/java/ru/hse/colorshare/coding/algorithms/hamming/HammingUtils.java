@@ -1,8 +1,6 @@
 package ru.hse.colorshare.coding.algorithms.hamming;
 
 
-import ru.hse.colorshare.coding.dto.BitArray;
-import ru.hse.colorshare.coding.dto.ShortBitArray;
 import ru.hse.colorshare.util.BitsUtils;
 import ru.hse.colorshare.util.Generator;
 import ru.hse.colorshare.util.LimitGenerator;

@@ -2,7 +2,7 @@ package ru.hse.colorshare.coding;
 
 import androidx.annotation.NonNull;
 
-import ru.hse.colorshare.coding.dto.BitArray;
+import ru.hse.colorshare.coding.algorithms.hamming.BitArray;
 
 public interface Encoder {
     @NonNull

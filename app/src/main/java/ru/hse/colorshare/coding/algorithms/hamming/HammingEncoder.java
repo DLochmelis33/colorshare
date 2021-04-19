@@ -2,10 +2,8 @@ package ru.hse.colorshare.coding.algorithms.hamming;
 
 import androidx.annotation.NonNull;
 
-import ru.hse.colorshare.coding.dto.BitArray;
 import ru.hse.colorshare.coding.CodingTag;
 import ru.hse.colorshare.coding.Encoder;
-import ru.hse.colorshare.coding.dto.ShortBitArray;
 
 public class HammingEncoder implements Encoder {
     @NonNull
