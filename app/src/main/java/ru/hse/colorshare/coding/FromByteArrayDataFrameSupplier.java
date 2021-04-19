@@ -33,8 +33,8 @@ public final class FromByteArrayDataFrameSupplier implements DataFrameSupplier {
     }
 
     private int readFrame() {
-        System.arraycopy(source, offset, frame, 0, min(frame.length, source.length - offset));
         int copied = min(frame.length, source.length - offset);
+        System.arraycopy(source, offset, frame, 0, copied);
         offset += copied;
         return copied;
     }
