@@ -2,11 +2,17 @@ package ru.hse.colorshare;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.content.res.Resources;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.SurfaceTexture;
+import android.graphics.drawable.Drawable;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
@@ -31,16 +37,17 @@ import java.util.Comparator;
 public class ReceiverCameraActivity extends AppCompatActivity {
 
     private CameraService cameraService;
-    private TextureView cameraTextureView; // ! will use to draw over camera image
+    private TextureView cameraTextureView; // ! ! ! ! ! will NOT use to draw over camera image
     private TextView dummyTextView;
 
     private static final String TAG = "ReceiverCameraActivity";
 
-    public static void sendReadingStatusMessage(Message msg) {
-        readingStatusHandler.sendMessage(msg);
+    public static Handler getReadingStatusHandler() {
+        return readingStatusHandler;
     }
 
     private static Handler readingStatusHandler;
+    private Drawable overlayCorner;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,12 +62,14 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         cameraTextureView = findViewById(R.id.cameraTextureView);
         dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
         cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView);
+        overlayCorner = ContextCompat.getDrawable(this, R.drawable.overlay_corner);
 
         readingStatusHandler = new Handler(Looper.myLooper()) {
             @Override
             public void handleMessage(Message msg) {
-                dummyTextView.setText((String) msg.obj);
-            };
+                dummyTextView.setText(String.valueOf(msg.obj));
+                // drawing in this thread is too slow
+            }
         };
 
         String cameraId = chooseCamera();

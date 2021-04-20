@@ -15,6 +15,7 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
@@ -152,26 +153,7 @@ public class CameraService {
                 Log.d(TAG, "chosen size = " + preferredSize);
                 resizePreviewViewToRatio(preferredSize);
 
-                imageReader = ImageReader.newInstance(preferredSize.getWidth(), preferredSize.getHeight(), IMAGE_FORMAT, 10); // ! maxImages
-                imageReader.setOnImageAvailableListener((ImageReader reader) -> {
-                    Image image = reader.acquireLatestImage();
-                    if (image == null) {
-                        Log.w(TAG, "null image");
-                        return;
-                    }
-                    if (BuildConfig.DEBUG && image.getFormat() != IMAGE_FORMAT) {
-                        throw new AssertionError("Image format is wrong");
-                    }
-                    // copy image data and close image
-                    ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-                    byte[] imageBytes = new byte[buffer.capacity()];
-                    buffer.get(imageBytes);
-                    image.close();
-                    // ! send image data for processing
-                    Message msg = Message.obtain();
-                    msg.obj = String.valueOf(imageBytes[0]);
-                    ReceiverCameraActivity.sendReadingStatusMessage(msg);
-                }, null);
+                imageReader = ImageReader.newInstance(preferredSize.getWidth(), preferredSize.getHeight(), IMAGE_FORMAT, 2); // 2 is minimum required for acquireLatestImage
 
                 // create CaptureRequest
                 captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD); // record vs preview?
@@ -221,6 +203,39 @@ public class CameraService {
                     @Override
                     public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
                         super.onCaptureCompleted(session, request, result);
+
+                        if(imageReader == null) {
+                            // can happen while closing
+                            return;
+                        }
+
+                        Image image = imageReader.acquireLatestImage();
+                        if (image == null) {
+                            Log.w(TAG, "null image");
+                            return;
+                        }
+                        if (BuildConfig.DEBUG && image.getFormat() != IMAGE_FORMAT) {
+                            throw new AssertionError("Image format is wrong");
+                        }
+
+                        // ! possibly incompatible with continuous or active AF
+//                        if (result.get(CaptureResult.CONTROL_AF_STATE) != CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED) {
+//                            image.close();
+//                            return;
+//                        }
+
+                        // copy image data and close image
+                        ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                        byte[] imageBytes = new byte[buffer.capacity()];
+                        buffer.get(imageBytes);
+                        image.close();
+                        // ! send image data for processing
+
+                        ImageProcessor.process(new ImageProcessor.Task(imageBytes, ReceiverCameraActivity.getReadingStatusHandler()));
+
+//                        Message msg = Message.obtain();
+//                        msg.obj = String.valueOf(imageBytes[0]);
+//                        ReceiverCameraActivity.sendReadingStatusMessage(msg);
                     }
 
                     @Override
