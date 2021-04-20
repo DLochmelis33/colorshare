@@ -12,6 +12,9 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 import android.util.Size;
 import android.view.MotionEvent;
@@ -20,6 +23,7 @@ import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -28,8 +32,15 @@ public class ReceiverCameraActivity extends AppCompatActivity {
 
     private CameraService cameraService;
     private TextureView cameraTextureView; // ! will use to draw over camera image
+    private TextView dummyTextView;
 
-    private static final String logTag = "ReceiverCameraActivity";
+    private static final String TAG = "ReceiverCameraActivity";
+
+    public static void sendReadingStatusMessage(Message msg) {
+        readingStatusHandler.sendMessage(msg);
+    }
+
+    private static Handler readingStatusHandler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,7 +53,15 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         }
 
         cameraTextureView = findViewById(R.id.cameraTextureView);
+        dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
         cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView);
+
+        readingStatusHandler = new Handler(Looper.myLooper()) {
+            @Override
+            public void handleMessage(Message msg) {
+                dummyTextView.setText((String) msg.obj);
+            };
+        };
 
         String cameraId = chooseCamera();
         if (cameraId == null) {
@@ -61,7 +80,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
 
             @Override
             public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
-                Log.d(logTag, "texture destroyed");
+                Log.d(TAG, "texture destroyed");
                 cameraService.closeCamera();
                 return false;
             }
@@ -71,6 +90,22 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             }
         });
 
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        cameraService.closeCamera();
     }
 
     // returns a camera that 1) is not monochrome 2) is of largest sensor area
