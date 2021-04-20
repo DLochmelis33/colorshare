@@ -1,37 +1,26 @@
 package ru.hse.colorshare;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
-
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.content.res.Resources;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.graphics.SurfaceTexture;
 import android.graphics.drawable.Drawable;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
-import android.hardware.camera2.params.StreamConfigurationMap;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.util.Size;
-import android.view.MotionEvent;
-import android.view.SurfaceView;
 import android.view.TextureView;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.widget.TextView;
 
-import java.util.Arrays;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+
 import java.util.Comparator;
 
 public class ReceiverCameraActivity extends AppCompatActivity {
@@ -71,6 +60,8 @@ public class ReceiverCameraActivity extends AppCompatActivity {
                 // drawing in this thread is too slow
             }
         };
+
+        ImageProcessor.setContext(getApplicationContext());
 
         String cameraId = chooseCamera();
         if (cameraId == null) {
@@ -115,6 +106,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         cameraService.closeCamera();
+        ImageProcessor.shutdown();
     }
 
     // returns a camera that 1) is not monochrome 2) is of largest sensor area

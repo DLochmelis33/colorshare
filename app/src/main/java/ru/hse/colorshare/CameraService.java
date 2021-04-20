@@ -4,10 +4,7 @@ package ru.hse.colorshare;
 import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
-import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -15,14 +12,10 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
-import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Message;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
@@ -204,7 +197,7 @@ public class CameraService {
                     public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
                         super.onCaptureCompleted(session, request, result);
 
-                        if(imageReader == null) {
+                        if (imageReader == null) {
                             // can happen while closing
                             return;
                         }
@@ -218,24 +211,24 @@ public class CameraService {
                             throw new AssertionError("Image format is wrong");
                         }
 
-                        // ! possibly incompatible with continuous or active AF
+                        // ! probably incompatible with continuous or active AF
 //                        if (result.get(CaptureResult.CONTROL_AF_STATE) != CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED) {
 //                            image.close();
 //                            return;
 //                        }
 
                         // copy image data and close image
-                        ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-                        byte[] imageBytes = new byte[buffer.capacity()];
-                        buffer.get(imageBytes);
-                        image.close();
-                        // ! send image data for processing
-
-                        ImageProcessor.process(new ImageProcessor.Task(imageBytes, ReceiverCameraActivity.getReadingStatusHandler()));
-
-//                        Message msg = Message.obtain();
-//                        msg.obj = String.valueOf(imageBytes[0]);
-//                        ReceiverCameraActivity.sendReadingStatusMessage(msg);
+                        ByteBuffer yBuffer = image.getPlanes()[0].getBuffer();
+                        ByteBuffer vuBuffer = image.getPlanes()[2].getBuffer();
+                        int width = image.getWidth();
+                        int height = image.getHeight();
+                        int ySize = yBuffer.remaining();
+                        int vuSize = vuBuffer.remaining();
+                        byte[] nv21 = new byte[ySize + vuSize]; // ! ?
+                        yBuffer.get(nv21, 0, ySize);
+                        vuBuffer.get(nv21, ySize, vuSize);
+                        image.close(); // asap
+                        ImageProcessor.process(new ImageProcessor.Task(nv21, width, height, ReceiverCameraActivity.getReadingStatusHandler()));
                     }
 
                     @Override
