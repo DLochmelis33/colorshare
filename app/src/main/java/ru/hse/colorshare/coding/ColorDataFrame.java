@@ -7,5 +7,7 @@ package ru.hse.colorshare.coding;
 public interface ColorDataFrame {
     long getChecksum();
 
+    int[] getChecksumAsColors();
+
     int[] getColors();
 }

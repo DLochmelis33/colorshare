@@ -1,13 +1,11 @@
-package ru.hse.colorshare.coding;
+package ru.hse.colorshare.coding.frames;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Stream;
+import java.util.BitSet;
 
-import static ru.hse.colorshare.coding.TwoBitsFrameUtil.ALL_TWO_BIT_UNITS;
-import static ru.hse.colorshare.coding.TwoBitsFrameUtil.UNIT_BITS_COUNT;
-import static ru.hse.colorshare.coding.TwoBitsFrameUtil.writeByteAsColors;
+import ru.hse.colorshare.coding.ColorDataFrame;
+
+import static ru.hse.colorshare.coding.frames.TwoBitsFrameUtil.UNIT_BITS_COUNT;
+import static ru.hse.colorshare.coding.frames.TwoBitsFrameUtil.writeByteAsColors;
 
 /*
     Implementation of DataFrame. One color per two bits.
@@ -33,6 +31,16 @@ public final class TwoBitsColorDataFrame implements ColorDataFrame {
     @Override
     public long getChecksum() {
         return checksum;
+    }
+
+    @Override
+    public int[] getChecksumAsColors() {
+        int unitsPerByte = Byte.SIZE / UNIT_BITS_COUNT;
+        int[] encoded = new int[unitsPerByte * Long.SIZE / Byte.SIZE];
+        for (int i = 0; i < Long.SIZE / Byte.SIZE; i++) {
+            writeByteAsColors(encoded, i * unitsPerByte, (byte) ((checksum >> (i * 8)) & 255));
+        }
+        return encoded;
     }
 
     @Override

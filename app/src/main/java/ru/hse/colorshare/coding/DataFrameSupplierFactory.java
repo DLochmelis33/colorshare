@@ -5,6 +5,8 @@ import android.net.Uri;
 
 import java.util.zip.CRC32;
 
+import ru.hse.colorshare.coding.suppliers.FromByteArrayDataFrameSupplier;
+
 public final class DataFrameSupplierFactory {
 
     public DataFrameSupplier get(Uri sourceFile, Context context) {
