@@ -2,9 +2,9 @@ package ru.hse.colorshare.generator;
 
 import android.graphics.Color;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
+
+import ru.hse.colorshare.frames.ColorDataFrame;
 
 public final class MockDataFrameGenerator implements DataFrameGenerator {
     private final int id;
@@ -21,19 +21,42 @@ public final class MockDataFrameGenerator implements DataFrameGenerator {
         currentFrameIndex = 0;
     }
 
+    public class MockDataFrame implements ColorDataFrame {
+        private final int[] colors;
+
+        public MockDataFrame(int[] colors) {
+            this.colors = colors;
+        }
+
+        @Override
+        public long getChecksum() {
+            return 0;
+        }
+
+        @Override
+        public int[] getChecksumAsColors() {
+            return new int[0];
+        }
+
+        @Override
+        public int[] getColors() {
+            return colors;
+        }
+    }
+
     @Override
-    public List<Integer> getNextDataFrame() {
+    public ColorDataFrame getNextDataFrame() {
         if (currentFrameIndex == framesNumber) {
             return null;
         }
-        List<Integer> dataFrame = new ArrayList<>();
+        int[] dataFrame = new int[frameSize];
         for (int i = 0; i < frameSize; ++i) {
-            dataFrame.add(Color.rgb(
+            dataFrame[i] = (Color.rgb(
                     random.nextInt(256),
                     random.nextInt(256),
                     random.nextInt(256)));
         }
-        return dataFrame;
+        return new MockDataFrame(dataFrame);
     }
 
     @Override

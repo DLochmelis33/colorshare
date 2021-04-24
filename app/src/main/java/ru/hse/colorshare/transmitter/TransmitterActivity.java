@@ -21,7 +21,6 @@ import android.view.View;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import ru.hse.colorshare.MainActivity;
@@ -244,7 +243,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     DataFrameGenerator generator = generatorFactory.getDataFrameGenerator();
                     Log.d(LOG_TAG, "Generator info: " + generator.getInfo());
                     try {
-                        List<Integer> colors = generator.getNextDataFrame();
+                        int[] colors = generator.getNextDataFrame().getColors();
                         if (colors == null) {
                             state = TransmissionState.FINISHED;
                             setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
@@ -297,7 +296,7 @@ public class TransmitterActivity extends AppCompatActivity {
                 }
             }
 
-            private int drawColorUnitsStripe(Canvas canvas, List<Integer> colors, int startIndex, int stripeHeight, int stripeWidth) {
+            private int drawColorUnitsStripe(Canvas canvas, int[] colors, int startIndex, int stripeHeight, int stripeWidth) {
                 // startIndex inclusive; stripeHeight and stripeWidth in units
                 paint.setStyle(Paint.Style.FILL);
                 int index = startIndex;
@@ -305,7 +304,7 @@ public class TransmitterActivity extends AppCompatActivity {
                 for (int i = 0; i < stripeHeight; i++) {
                     canvas.save();
                     for (int j = 0; j < stripeWidth; j++) {
-                        paint.setColor(colors.get(index));
+                        paint.setColor(colors[index]);
                         canvas.drawRect(params.unitRect, paint);
                         canvas.translate(params.unitSize, 0);
                         index++;

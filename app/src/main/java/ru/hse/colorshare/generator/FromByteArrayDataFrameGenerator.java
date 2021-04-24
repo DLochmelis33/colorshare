@@ -1,15 +1,13 @@
-package ru.hse.colorshare.coding.suppliers;
+package ru.hse.colorshare.generator;
 
 
 import java.util.zip.Checksum;
 
-import ru.hse.colorshare.coding.ColorDataFrame;
-import ru.hse.colorshare.coding.DataFrameSupplier;
-import ru.hse.colorshare.coding.frames.TwoBitsColorDataFrame;
+import ru.hse.colorshare.frames.TwoBitsColorDataFrame;
 
 import static java.lang.Math.min;
 
-public final class FromByteArrayDataFrameSupplier extends AbstractDataFrameSupplier implements DataFrameSupplier {
+public final class FromByteArrayDataFrameGenerator extends AbstractDataFrameGenerator implements DataFrameGenerator {
 
     private final byte[] source;
     private int offset = 0;
@@ -17,7 +15,7 @@ public final class FromByteArrayDataFrameSupplier extends AbstractDataFrameSuppl
     private final byte[] frame;
     private final Checksum checksum;
 
-    public FromByteArrayDataFrameSupplier(byte[] source, Checksum checksum, int bytesPerFrame) {
+    public FromByteArrayDataFrameGenerator(byte[] source, Checksum checksum, int bytesPerFrame) {
         this.source = source;
         this.frame = new byte[bytesPerFrame];
         this.checksum = checksum;

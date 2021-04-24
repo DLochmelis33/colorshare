@@ -1,11 +1,7 @@
-package ru.hse.colorshare.coding.frames;
+package ru.hse.colorshare.frames;
 
-import java.util.BitSet;
-
-import ru.hse.colorshare.coding.ColorDataFrame;
-
-import static ru.hse.colorshare.coding.frames.TwoBitsFrameUtil.UNIT_BITS_COUNT;
-import static ru.hse.colorshare.coding.frames.TwoBitsFrameUtil.writeByteAsColors;
+import static ru.hse.colorshare.frames.TwoBitsFrameUtil.UNIT_BITS_COUNT;
+import static ru.hse.colorshare.frames.TwoBitsFrameUtil.writeByteAsColors;
 
 /*
     Implementation of DataFrame. One color per two bits.

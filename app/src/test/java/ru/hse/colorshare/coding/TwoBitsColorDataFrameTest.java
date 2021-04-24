@@ -4,9 +4,7 @@ package ru.hse.colorshare.coding;
 import org.junit.Assert;
 import org.junit.Test;
 
-import ru.hse.colorshare.coding.frames.TwoBitsColorDataFrame;
-
-import static ru.hse.colorshare.coding.TestUtils.map;
+import ru.hse.colorshare.frames.TwoBitsColorDataFrame;
 
 public class TwoBitsColorDataFrameTest {
     @Test

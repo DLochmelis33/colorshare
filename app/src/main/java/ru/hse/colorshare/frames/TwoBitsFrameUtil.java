@@ -1,4 +1,4 @@
-package ru.hse.colorshare.coding.frames;
+package ru.hse.colorshare.frames;
 
 import android.graphics.Color;
 

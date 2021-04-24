@@ -2,7 +2,7 @@ package ru.hse.colorshare.coding;
 
 import java.util.Map;
 
-import ru.hse.colorshare.coding.frames.TwoBitsFrameUtil;
+import ru.hse.colorshare.frames.TwoBitsFrameUtil;
 
 public class TestUtils {
     public static final Map<Integer, Integer> map = TwoBitsFrameUtil.FROM_BITS;

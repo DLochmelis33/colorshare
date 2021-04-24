@@ -1,9 +1,8 @@
-package ru.hse.colorshare.coding.suppliers;
+package ru.hse.colorshare.generator;
 
-import ru.hse.colorshare.coding.ColorDataFrame;
-import ru.hse.colorshare.coding.DataFrameSupplier;
+import ru.hse.colorshare.frames.ColorDataFrame;
 
-public abstract class AbstractDataFrameSupplier implements DataFrameSupplier {
+public abstract class AbstractDataFrameGenerator implements DataFrameGenerator {
     protected ColorDataFrame previous;
     protected int currentFrameIndex;
 
@@ -26,7 +25,7 @@ public abstract class AbstractDataFrameSupplier implements DataFrameSupplier {
     protected abstract boolean hasMore();
 
     @Override
-    public ColorDataFrame get() {
+    public ColorDataFrame getNextDataFrame() {
         switch (state) {
             case WAITING:
                 throw new IllegalStateException("You have to call setSuccess before");
