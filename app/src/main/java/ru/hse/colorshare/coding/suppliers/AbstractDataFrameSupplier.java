@@ -16,8 +16,6 @@ public abstract class AbstractDataFrameSupplier implements DataFrameSupplier {
 
     private State state = State.GENERATING;
 
-
-
     private ColorDataFrame previousAndChangeState() {
         assert state == State.GENERATING || state == State.PREVIOUS;
         state = State.WAITING;

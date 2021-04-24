@@ -1,7 +1,5 @@
 package ru.hse.colorshare.coding;
 
-import ru.hse.colorshare.util.Supplier;
-
 /*
     Interface describes Data frame generator.
     Usage:
@@ -12,12 +10,20 @@ import ru.hse.colorshare.util.Supplier;
         - When there is no more data to transmit get returns NULL.
  */
 
-public interface DataFrameSupplier extends Supplier<ColorDataFrame> {
+public interface DataFrameSupplier {
+
+    // get next data frame
+    ColorDataFrame get();
+
+    // set success on last frame sending
     void setSuccess(boolean success);
 
+    // @return approximate count of frames left
     long estimateSize();
 
+    // @return index of a current frame
     int getFrameIndex();
 
+    // Some logging information. Maybe we'll include some logging library
     String getInfo();
 }
