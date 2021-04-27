@@ -10,6 +10,7 @@ import ru.hse.colorshare.frames.BulkColorDataFrames;
 import ru.hse.colorshare.frames.ColorDataFrame;
 import ru.hse.colorshare.generator.DataFrameGenerator;
 import ru.hse.colorshare.generator.FromByteArrayDataFrameGenerator;
+import ru.hse.colorshare.generator.GenerationException;
 
 public class ColorDataFrameSupplierTest {
 
@@ -40,7 +41,7 @@ public class ColorDataFrameSupplierTest {
     }
 
     @Test
-    public void fromByteArrayDataFrameSupplierTest() {
+    public void fromByteArrayDataFrameSupplierTest() throws GenerationException {
         byte[] bytes = TestUtils.toBytes(0b0011_1100, 0b1010_1010);
         DataFrameGenerator supplier1 = new FromByteArrayDataFrameGenerator(bytes, new CRC32(), 2, 1);
         DataFrameGenerator supplier2 = new FromByteArrayDataFrameGenerator(bytes, new CRC32(), 3, 1);
@@ -83,7 +84,7 @@ public class ColorDataFrameSupplierTest {
     }
 
     @Test
-    public void checkSumAsColorsTest() {
+    public void checkSumAsColorsTest() throws GenerationException {
         byte[] bytes = TestUtils.toBytes(0b0000_0000, 0b1111_0000);
         DataFrameGenerator supplier = new FromByteArrayDataFrameGenerator(bytes, new MockChecksum(), 2, 1);
         BulkColorDataFrames frame = supplier.getNextBulk();

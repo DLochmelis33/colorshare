@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import ru.hse.colorshare.MainActivity;
 import ru.hse.colorshare.generator.DataFrameGenerator;
 import ru.hse.colorshare.generator.DataFrameGeneratorFactory;
+import ru.hse.colorshare.generator.GenerationException;
 
 public class TransmitterActivity extends AppCompatActivity {
 
@@ -243,7 +244,12 @@ public class TransmitterActivity extends AppCompatActivity {
                     DataFrameGenerator generator = generatorFactory.getDataFrameGenerator();
                     Log.d(LOG_TAG, "Generator info: " + generator.getInfo());
                     try {
-                        int[] colors = generator.getNextBulk().getDataFrames()[0].getColors();
+                        int[] colors = new int[0];
+                        try {
+                            colors = generator.getNextBulk().getDataFrames()[0].getColors();
+                        } catch (GenerationException e) {
+                            e.printStackTrace();
+                        }
                         if (colors == null) {
                             state = TransmissionState.FINISHED;
                             setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
@@ -293,7 +299,11 @@ public class TransmitterActivity extends AppCompatActivity {
                     boolean response = waitForReceiverResponse();
                     Log.d(LOG_TAG, "data frame #" + generator.getBulkIndex() +
                             " was successfully sent = " + response);
-                    generator.setSuccess(response);
+                    try {
+                        generator.setSuccess(response);
+                    } catch (GenerationException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
 

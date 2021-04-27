@@ -21,11 +21,12 @@ public abstract class AbstractDataFrameGenerator implements DataFrameGenerator {
         return previous;
     }
 
-    protected abstract void processFurther();
-    protected abstract boolean hasMore();
+    protected abstract void processFurther() throws GenerationException;
+
+    protected abstract boolean hasMore() throws GenerationException;
 
     @Override
-    public BulkColorDataFrames getNextBulk() {
+    public BulkColorDataFrames getNextBulk() throws GenerationException {
         switch (state) {
             case WAITING:
                 throw new IllegalStateException("You have to call setSuccess before");
@@ -42,7 +43,7 @@ public abstract class AbstractDataFrameGenerator implements DataFrameGenerator {
     }
 
     @Override
-    public void setSuccess(boolean success) {
+    public void setSuccess(boolean success) throws GenerationException {
         switch (state) {
             case PREVIOUS:
             case GENERATING:
@@ -60,4 +61,10 @@ public abstract class AbstractDataFrameGenerator implements DataFrameGenerator {
                 }
         }
     }
+
+    @Override
+    public int getBulkIndex() {
+        return currentBulkIndex;
+    }
+
 }

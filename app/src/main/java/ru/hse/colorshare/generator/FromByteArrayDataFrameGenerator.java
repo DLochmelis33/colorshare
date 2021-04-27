@@ -4,6 +4,7 @@ package ru.hse.colorshare.generator;
 import java.util.zip.Checksum;
 
 import ru.hse.colorshare.frames.BulkColorDataFrames;
+import ru.hse.colorshare.frames.ColorDataFrame;
 import ru.hse.colorshare.frames.TwoBitsColorDataFrame;
 
 import static java.lang.Math.min;
@@ -35,13 +36,14 @@ public final class FromByteArrayDataFrameGenerator extends AbstractDataFrameGene
     @Override
     protected void processFurther() {
         assert  offset < source.length;
-        previous = new BulkColorDataFrames(bulkSize);
+        ColorDataFrame[] bulk = new ColorDataFrame[bulkSize];
         for (int i = 0; i < bulkSize && hasMore(); i++) {
             int read = readFrame();
             checksum.update(frame, 0, read);
-            previous.appendDataFrame(new TwoBitsColorDataFrame(frame, 0, read, checksum.getValue()));
+            bulk[i] = new TwoBitsColorDataFrame(frame, 0, read, checksum.getValue());
             checksum.reset();
         }
+        previous = new BulkColorDataFrames(bulk);
     }
 
     @Override
@@ -53,11 +55,6 @@ public final class FromByteArrayDataFrameGenerator extends AbstractDataFrameGene
     @Override
     public long estimateSize() {
         return (source.length - offset) / frame.length;
-    }
-
-    @Override
-    public int getBulkIndex() {
-        return currentBulkIndex;
     }
 
     @Override

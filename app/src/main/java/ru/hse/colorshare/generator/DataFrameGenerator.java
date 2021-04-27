@@ -15,13 +15,13 @@ import ru.hse.colorshare.frames.BulkColorDataFrames;
 public interface DataFrameGenerator {
 
     // get next data frame
-    BulkColorDataFrames getNextBulk();
+    BulkColorDataFrames getNextBulk() throws GenerationException;
 
     // set success on last bulk sending
-    void setSuccess(boolean result);
+    void setSuccess(boolean result) throws GenerationException;
 
     // @return approximate count of bulks left
-    long estimateSize();
+    long estimateSize() throws GenerationException;
 
     // @return index of a current frame
     int getBulkIndex();
