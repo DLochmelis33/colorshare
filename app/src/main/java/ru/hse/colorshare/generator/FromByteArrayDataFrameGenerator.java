@@ -3,6 +3,7 @@ package ru.hse.colorshare.generator;
 
 import java.util.zip.Checksum;
 
+import ru.hse.colorshare.frames.BulkColorDataFrames;
 import ru.hse.colorshare.frames.TwoBitsColorDataFrame;
 
 import static java.lang.Math.min;
@@ -15,10 +16,13 @@ public final class FromByteArrayDataFrameGenerator extends AbstractDataFrameGene
     private final byte[] frame;
     private final Checksum checksum;
 
-    public FromByteArrayDataFrameGenerator(byte[] source, Checksum checksum, int bytesPerFrame) {
+    private final int bulkSize;
+
+    public FromByteArrayDataFrameGenerator(byte[] source, Checksum checksum, int bytesPerFrame, int bulkSize) {
         this.source = source;
         this.frame = new byte[bytesPerFrame];
         this.checksum = checksum;
+        this.bulkSize = bulkSize;
     }
 
     private int readFrame() {
@@ -31,10 +35,13 @@ public final class FromByteArrayDataFrameGenerator extends AbstractDataFrameGene
     @Override
     protected void processFurther() {
         assert  offset < source.length;
-        int read = readFrame();
-        checksum.update(frame, 0, read);
-        previous = new TwoBitsColorDataFrame(frame, 0, read, checksum.getValue());
-        checksum.reset();
+        previous = new BulkColorDataFrames(bulkSize);
+        for (int i = 0; i < bulkSize && hasMore(); i++) {
+            int read = readFrame();
+            checksum.update(frame, 0, read);
+            previous.appendDataFrame(new TwoBitsColorDataFrame(frame, 0, read, checksum.getValue()));
+            checksum.reset();
+        }
     }
 
     @Override
@@ -49,13 +56,13 @@ public final class FromByteArrayDataFrameGenerator extends AbstractDataFrameGene
     }
 
     @Override
-    public int getFrameIndex() {
-        return currentFrameIndex;
+    public int getBulkIndex() {
+        return currentBulkIndex;
     }
 
     @Override
     public String getInfo() {
-        return  "currentFrameIndex = " + currentFrameIndex;
+        return  "currentFrameIndex = " + currentBulkIndex;
     }
 
 

@@ -19,19 +19,18 @@ import android.view.SurfaceView;
 import android.view.View;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 
 import ru.hse.colorshare.MainActivity;
 import ru.hse.colorshare.generator.DataFrameGenerator;
-import ru.hse.colorshare.generator.MockDataFrameGeneratorFactory;
+import ru.hse.colorshare.generator.DataFrameGeneratorFactory;
 
 public class TransmitterActivity extends AppCompatActivity {
 
     private TransmissionState state;
     private TransmissionParams params;
-    private MockDataFrameGeneratorFactory generatorFactory;
+    private DataFrameGeneratorFactory generatorFactory;
 
     private int screenOrientation;
 
@@ -59,7 +58,7 @@ public class TransmitterActivity extends AppCompatActivity {
         Log.d(LOG_TAG, "received intent: " + "uri = " + fileToSendUri);
 
         try {
-            generatorFactory = new MockDataFrameGeneratorFactory(fileToSendUri, this);
+            generatorFactory = new DataFrameGeneratorFactory(fileToSendUri, this);
         } catch (FileNotFoundException exc) {
             setResult(MainActivity.TransmissionResultCode.FAILED_TO_READ_FILE.value, new Intent());
             finish();
@@ -94,13 +93,14 @@ public class TransmitterActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        try {
+       /* try {
             if (generatorFactory != null) {
-                generatorFactory.finish();
+                // generatorFactory.finish();
             }
         } catch (IOException exc) {
             throw new RuntimeException("Transmission file failed to close", exc);
         }
+        */
     }
 
     protected void onSaveInstanceState(@NonNull Bundle outState) {
@@ -243,7 +243,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     DataFrameGenerator generator = generatorFactory.getDataFrameGenerator();
                     Log.d(LOG_TAG, "Generator info: " + generator.getInfo());
                     try {
-                        int[] colors = generator.getNextDataFrame().getColors();
+                        int[] colors = generator.getNextBulk().getDataFrames()[0].getColors();
                         if (colors == null) {
                             state = TransmissionState.FINISHED;
                             setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
@@ -256,6 +256,7 @@ public class TransmitterActivity extends AppCompatActivity {
                         synchronized (surfaceHolderWeakRef.get()) { // probably, synchronised is unnecessary
                             canvas.drawColor(Color.BLACK);
                             canvas.translate(params.leftTopOfGreed.x, params.leftTopOfGreed.y);
+
                             canvas.save();
 
                             int locatorMarkSize = LocatorMarkGraphic.SIDE_SIZE_IN_UNITS;
@@ -290,7 +291,7 @@ public class TransmitterActivity extends AppCompatActivity {
                         }
                     }
                     boolean response = waitForReceiverResponse();
-                    Log.d(LOG_TAG, "data frame #" + generator.getFrameIndex() +
+                    Log.d(LOG_TAG, "data frame #" + generator.getBulkIndex() +
                             " was successfully sent = " + response);
                     generator.setSuccess(response);
                 }

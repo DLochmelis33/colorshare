@@ -1,6 +1,6 @@
 package ru.hse.colorshare.generator;
 
-import ru.hse.colorshare.frames.ColorDataFrame;
+import ru.hse.colorshare.frames.BulkColorDataFrames;
 
 /*
     Interface describes Data frame generator.
@@ -15,16 +15,16 @@ import ru.hse.colorshare.frames.ColorDataFrame;
 public interface DataFrameGenerator {
 
     // get next data frame
-    ColorDataFrame getNextDataFrame();
+    BulkColorDataFrames getNextBulk();
 
-    // set success on last frame sending
+    // set success on last bulk sending
     void setSuccess(boolean result);
 
-    // @return approximate count of frames left
+    // @return approximate count of bulks left
     long estimateSize();
 
     // @return index of a current frame
-    int getFrameIndex();
+    int getBulkIndex();
 
     // Some logging information. Maybe we'll include some logging library
     String getInfo();

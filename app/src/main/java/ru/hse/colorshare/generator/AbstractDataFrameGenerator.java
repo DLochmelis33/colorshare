@@ -1,10 +1,10 @@
 package ru.hse.colorshare.generator;
 
-import ru.hse.colorshare.frames.ColorDataFrame;
+import ru.hse.colorshare.frames.BulkColorDataFrames;
 
 public abstract class AbstractDataFrameGenerator implements DataFrameGenerator {
-    protected ColorDataFrame previous;
-    protected int currentFrameIndex;
+    protected BulkColorDataFrames previous;
+    protected int currentBulkIndex;
 
     private enum State {
         GENERATING,
@@ -15,7 +15,7 @@ public abstract class AbstractDataFrameGenerator implements DataFrameGenerator {
 
     private State state = State.GENERATING;
 
-    private ColorDataFrame previousAndChangeState() {
+    private BulkColorDataFrames previousAndChangeState() {
         assert state == State.GENERATING || state == State.PREVIOUS;
         state = State.WAITING;
         return previous;
@@ -25,7 +25,7 @@ public abstract class AbstractDataFrameGenerator implements DataFrameGenerator {
     protected abstract boolean hasMore();
 
     @Override
-    public ColorDataFrame getNextDataFrame() {
+    public BulkColorDataFrames getNextBulk() {
         switch (state) {
             case WAITING:
                 throw new IllegalStateException("You have to call setSuccess before");
@@ -54,7 +54,7 @@ public abstract class AbstractDataFrameGenerator implements DataFrameGenerator {
                     state = State.DONE;
                 } else if (success) {
                     state  = State.GENERATING;
-                    currentFrameIndex++;
+                    currentBulkIndex++;
                 } else {
                     state = State.PREVIOUS;
                 }
