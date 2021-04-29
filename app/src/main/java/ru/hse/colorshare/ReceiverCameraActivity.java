@@ -4,7 +4,6 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
-import android.graphics.drawable.Drawable;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
@@ -19,14 +18,12 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 
 import java.util.Comparator;
 
 public class ReceiverCameraActivity extends AppCompatActivity {
 
     private CameraService cameraService;
-    private TextureView cameraTextureView; // ! ! ! ! ! will NOT use to draw over camera image
     private TextView dummyTextView;
 
     private static final String TAG = "ReceiverCameraActivity";
@@ -36,7 +33,6 @@ public class ReceiverCameraActivity extends AppCompatActivity {
     }
 
     private static Handler readingStatusHandler;
-    private Drawable overlayCorner;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,10 +44,13 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             throw new AssertionError("expected camera permission");
         }
 
-        cameraTextureView = findViewById(R.id.cameraTextureView);
+        CameraOverlaidView cameraTextureView = findViewById(R.id.cameraTextureView);
+        FrameOverlayView frameOverlayView = findViewById(R.id.frameOverlayView);
+        cameraTextureView.setOverlayView(frameOverlayView);
+        frameOverlayView.setUnderlyingView(cameraTextureView);
+
         dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
         cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView);
-        overlayCorner = ContextCompat.getDrawable(this, R.drawable.overlay_corner);
 
         readingStatusHandler = new Handler(Looper.myLooper()) {
             @Override
@@ -61,7 +60,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             }
         };
 
-        ImageProcessor.setContext(getApplicationContext());
+        ImageProcessor.getInstance().setContext(getApplicationContext());
 
         String cameraId = chooseCamera();
         if (cameraId == null) {
@@ -106,7 +105,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         cameraService.closeCamera();
-        ImageProcessor.shutdown();
+//        ImageProcessor.getInstance().EXECUTOR.shutdownNow();
     }
 
     // returns a camera that 1) is not monochrome 2) is of largest sensor area
@@ -126,7 +125,13 @@ public class ReceiverCameraActivity extends AppCompatActivity {
                     }
                     Comparator<String> cameraIdByResolutionComparator = new Comparator<String>() {
                         private long convertIdToResolution(String id) {
-                            Size pixelArraySize = cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE);
+                            CameraCharacteristics cc;
+                            try {
+                                cc = manager.getCameraCharacteristics(id);
+                            } catch (CameraAccessException e) {
+                                throw new IllegalArgumentException("invalid camera id", e);
+                            }
+                            Size pixelArraySize = cc.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE);
                             return (long) pixelArraySize.getHeight() * pixelArraySize.getWidth();
                         }
 

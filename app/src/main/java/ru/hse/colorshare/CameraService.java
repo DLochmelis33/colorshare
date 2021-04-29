@@ -204,7 +204,7 @@ public class CameraService {
 
                         Image image = imageReader.acquireLatestImage();
                         if (image == null) {
-                            Log.w(TAG, "null image");
+                            Log.v(TAG, "null image");
                             return;
                         }
                         if (BuildConfig.DEBUG && image.getFormat() != IMAGE_FORMAT) {
@@ -227,8 +227,8 @@ public class CameraService {
                         byte[] nv21 = new byte[ySize + vuSize]; // ! ?
                         yBuffer.get(nv21, 0, ySize);
                         vuBuffer.get(nv21, ySize, vuSize);
-                        image.close(); // asap
-                        ImageProcessor.process(new ImageProcessor.Task(nv21, width, height, ReceiverCameraActivity.getReadingStatusHandler()));
+                        image.close(); // ASAP
+                        ImageProcessor.getInstance().EXECUTOR.execute(new ImageProcessor.Task(nv21, width, height, ReceiverCameraActivity.getReadingStatusHandler()));
                     }
 
                     @Override

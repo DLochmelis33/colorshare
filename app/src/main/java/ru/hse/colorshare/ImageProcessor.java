@@ -9,12 +9,9 @@ import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
-import android.util.Log;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ImageProcessor {
 
@@ -35,76 +32,74 @@ public class ImageProcessor {
 
         @Override
         public void run() {
-            if (ImageProcessor.length != imageBytes.length || ImageProcessor.width != width || ImageProcessor.height != height) {
-                Log.w(TAG, "changing ImageProcessor parameters");
-                ImageProcessor.width = width;
-                ImageProcessor.height = height;
-                ImageProcessor.length = imageBytes.length;
-                ImageProcessor.init();
+            if (!ImageProcessor.getInstance().isInit) {
+                ImageProcessor.getInstance().init(width, height, imageBytes.length);
             }
-            Bitmap bitmap = yuv420ToBitmap(imageBytes);
+            if (ImageProcessor.getInstance().length != imageBytes.length || ImageProcessor.getInstance().width != width || ImageProcessor.getInstance().height != height) {
+                throw new IllegalStateException("ImageProcessor parameters cannot change");
+            }
+            Bitmap bitmap = ImageProcessor.getInstance().yuv420ToBitmap(imageBytes);
             // TODO
             Message msg = Message.obtain(resultHandler, 0, String.format("#%06X", (0xFFFFFF & bitmap.getPixel(0, 0))));
             msg.sendToTarget();
         }
     }
 
-    // everything is static in order to avoid being synchronized (speed optimization)
     private ImageProcessor() {
     }
 
-    private static final int corePoolSize = 1;
-    private static final int maximumPoolSize = 5; // ! subject to change, needs irl testing
-    private static final long keepAliveTime = 1000;
-    private static final TimeUnit unit = TimeUnit.MILLISECONDS;
+    private static final ImageProcessor instance = new ImageProcessor(); // ! ! ! ! !
 
-    private static final int maximumQueueCapacity = 40; // ! subject to change, value of 40 goes well with 50ms latency
-    private static final BlockingQueue<Runnable> tasksQueue = new ArrayBlockingQueue<>(maximumQueueCapacity);
-    private static final ThreadPoolExecutor executor = new ThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime, unit, tasksQueue);
-
-    public static void process(Task t) {
-        executor.execute(t);
-        if (tasksQueue.size() > maximumQueueCapacity * 0.9) {
-            Log.w(TAG, "approaching tasks queue capacity: " + tasksQueue.size() + " / " + maximumQueueCapacity);
-        }
+    public static ImageProcessor getInstance() {
+        return instance;
     }
 
-    public static void shutdown() {
-        executor.shutdown();
-    }
+    private final int poolSize = 5; // ! needs testing
+    public final ExecutorService EXECUTOR = Executors.newFixedThreadPool(poolSize);
 
-    private static Context context = null; // ! ! ! ! !
+    private Context context = null;
 
-    public synchronized static void setContext(Context context) {
-        if (ImageProcessor.context != null) {
-            throw new IllegalStateException("can set context only once");
-        }
-        ImageProcessor.context = context;
+    public synchronized void setContext(Context context) {
+        this.context = context;
     }
 
 // ----------- image processing methods below -----------
 
-    private static ScriptIntrinsicYuvToRGB script;
-    private static Allocation in, out;
+    public static final double RATIO = 16.0 / 9.0;
 
-    public static int width, height, length;
+    private ScriptIntrinsicYuvToRGB script;
+    private Allocation in, out;
 
-    public static void init() {
+    private boolean isInit = false;
+    private int width, height, length;
+
+    public synchronized void init(int width, int height, int length) {
+        if (isInit) {
+            return;
+        }
+        this.width = width;
+        this.height = height;
+        this.length = length;
+
         RenderScript rs = RenderScript.create(context);
         script = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
 
         Type.Builder yuvType = new Type.Builder(rs, Element.U8(rs)).setX(length);
         in = Allocation.createTyped(rs, yuvType.create(), Allocation.USAGE_SCRIPT);
+        assert in != null;
 
         Type.Builder rgbaType = new Type.Builder(rs, Element.RGBA_8888(rs)).setX(width).setY(height);
         out = Allocation.createTyped(rs, rgbaType.create(), Allocation.USAGE_SCRIPT);
+        assert out != null;
 
         // The allocations above "should" be cached if you are going to perform
         // repeated conversion of YUV_420_888 to Bitmap.
+
+        isInit = true;
     }
 
     // ! copypasted from https://blog.minhazav.dev/how-to-convert-yuv-420-sp-android.media.Image-to-Bitmap-or-jpeg/
-    private static Bitmap yuv420ToBitmap(byte[] yuvByteArray) {
+    private Bitmap yuv420ToBitmap(byte[] yuvByteArray) {
         in.copyFrom(yuvByteArray);
         script.setInput(in);
         script.forEach(out);

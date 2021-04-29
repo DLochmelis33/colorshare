@@ -19,13 +19,20 @@
             android:layout_width="match_parent"
             android:layout_height="675dp">
 
-            <TextureView
+            <ru.hse.colorshare.CameraOverlaidView
                 android:id="@+id/cameraTextureView"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:focusable="auto"
+                android:clickable="true"
+                android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:keepScreenOn="true" />
+
+            <ru.hse.colorshare.FrameOverlayView
+                android:id="@+id/frameOverlayView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
         </FrameLayout>
 
         <androidx.coordinatorlayout.widget.CoordinatorLayout
