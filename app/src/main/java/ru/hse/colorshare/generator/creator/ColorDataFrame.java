@@ -1,4 +1,4 @@
-package ru.hse.colorshare.frames;
+package ru.hse.colorshare.generator.creator;
 
 /*
     Description of a data structure which is transferring to VIEW

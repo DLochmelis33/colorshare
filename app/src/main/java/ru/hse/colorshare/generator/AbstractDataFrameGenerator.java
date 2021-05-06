@@ -1,6 +1,6 @@
 package ru.hse.colorshare.generator;
 
-import ru.hse.colorshare.frames.BulkColorDataFrames;
+import ru.hse.colorshare.generator.creator.BulkColorDataFrames;
 
 public abstract class AbstractDataFrameGenerator implements DataFrameGenerator {
     protected BulkColorDataFrames previous;

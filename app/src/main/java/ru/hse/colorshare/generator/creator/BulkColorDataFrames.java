@@ -1,4 +1,4 @@
-package ru.hse.colorshare.frames;
+package ru.hse.colorshare.generator.creator;
 
 /*
     Здесь возможна дополнительная информация

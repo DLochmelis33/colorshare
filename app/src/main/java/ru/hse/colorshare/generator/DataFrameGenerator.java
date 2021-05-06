@@ -1,6 +1,9 @@
 package ru.hse.colorshare.generator;
 
-import ru.hse.colorshare.frames.BulkColorDataFrames;
+import java.io.Closeable;
+
+import ru.hse.colorshare.generator.creator.BulkColorDataFrames;
+import ru.hse.colorshare.transmitter.TransmissionParams;
 
 /*
     Interface describes Data frame generator.
@@ -12,7 +15,7 @@ import ru.hse.colorshare.frames.BulkColorDataFrames;
         - When there is no more data to transmit get returns NULL.
  */
 
-public interface DataFrameGenerator {
+public interface DataFrameGenerator extends Closeable {
 
     // get next data frame
     BulkColorDataFrames getNextBulk() throws GenerationException;
@@ -28,4 +31,8 @@ public interface DataFrameGenerator {
 
     // Some logging information. Maybe we'll include some logging library
     String getInfo();
+
+    void setTransmissionParameters(int unitsPerFrame, int framesPerBulk);
+
+    void setTransmissionParameters(TransmissionParams params);
 }

@@ -6,6 +6,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.database.Cursor;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -13,25 +14,31 @@ import android.graphics.PointF;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
 
 import ru.hse.colorshare.MainActivity;
 import ru.hse.colorshare.generator.DataFrameGenerator;
-import ru.hse.colorshare.generator.DataFrameGeneratorFactory;
+import ru.hse.colorshare.generator.FileDataFrameGenerator;
 import ru.hse.colorshare.generator.GenerationException;
 
 public class TransmitterActivity extends AppCompatActivity {
 
     private TransmissionState state;
     private TransmissionParams params;
-    private DataFrameGeneratorFactory generatorFactory;
+    private DataFrameGenerator generator;
 
     private int screenOrientation;
 
@@ -59,8 +66,15 @@ public class TransmitterActivity extends AppCompatActivity {
         Log.d(LOG_TAG, "received intent: " + "uri = " + fileToSendUri);
 
         try {
-            generatorFactory = new DataFrameGeneratorFactory(fileToSendUri, this);
+            Log.d(LOG_TAG, Integer.toString(getContentResolver().openInputStream(fileToSendUri).read()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            generator = new FileDataFrameGenerator(fileToSendUri, this);
         } catch (FileNotFoundException exc) {
+            Log.d(LOG_TAG, exc.getMessage());
             setResult(MainActivity.TransmissionResultCode.FAILED_TO_READ_FILE.value, new Intent());
             finish();
             return;
@@ -140,7 +154,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     finish();
                     return;
                 }
-                generatorFactory.setParams(params);
+                generator.setTransmissionParameters(params);
             }
             if (params == null) {
                 throw new IllegalStateException("transmission params remain null in state " + state);
@@ -241,7 +255,6 @@ public class TransmitterActivity extends AppCompatActivity {
                 Canvas canvas;
                 while (running) {
                     canvas = null;
-                    DataFrameGenerator generator = generatorFactory.getDataFrameGenerator();
                     Log.d(LOG_TAG, "Generator info: " + generator.getInfo());
                     try {
                         int[] colors = new int[0];
