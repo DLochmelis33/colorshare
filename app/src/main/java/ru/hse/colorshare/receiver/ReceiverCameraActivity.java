@@ -1,4 +1,4 @@
-package ru.hse.colorshare;
+package ru.hse.colorshare.receiver;
 
 import android.Manifest;
 import android.content.Context;
@@ -20,6 +20,9 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.util.Comparator;
+
+import ru.hse.colorshare.BuildConfig;
+import ru.hse.colorshare.R;
 
 public class ReceiverCameraActivity extends AppCompatActivity {
 
@@ -117,9 +120,12 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             for (String cameraId : manager.getCameraIdList()) {
                 CameraCharacteristics cameraCharacteristics = manager.getCameraCharacteristics(cameraId);
 
-                if (cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
-                        && cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT) != CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_MONO) {
-
+                boolean isFacingBack = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK;
+                boolean isNotMono = true;
+                if(cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT) != null && cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT) == CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_MONO) {
+                    isNotMono = false;
+                }
+                if (isFacingBack && isNotMono) {
                     if (bestCameraId == null) {
                         bestCameraId = cameraId;
                     }

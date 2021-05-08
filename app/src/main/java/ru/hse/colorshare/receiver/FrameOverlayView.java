@@ -1,4 +1,4 @@
-package ru.hse.colorshare;
+package ru.hse.colorshare.receiver;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -16,6 +16,9 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import ru.hse.colorshare.R;
+import ru.hse.colorshare.util.RelativePoint;
 
 public class FrameOverlayView extends View {
 
@@ -40,6 +43,8 @@ public class FrameOverlayView extends View {
     private class OverlayFrame extends Drawable {
 
         private Matrix ul, ur, dr, dl;
+        double[] xHints = new double[4];
+        double[] yHints = new double[4];
 
         public void resizeToView(int w, int h) {
             Log.d("frameOverlay", "resizing to w=" + w + " h=" + h);
@@ -60,10 +65,24 @@ public class FrameOverlayView extends View {
             }
 
             setupMatrices();
+
+            if (underlyingView == null) {
+                return;
+            }
+            double viewWidth = underlyingView.getWidth();
+            double viewHeight = underlyingView.getHeight();
             ul.postTranslate((float) marginX, (float) marginY);
+            xHints[0] = marginX / viewWidth;
+            yHints[0] = marginY / viewHeight;
             ur.postTranslate((float) (marginX + resultW), (float) marginY);
+            xHints[1] = (marginX + resultW) / viewWidth;
+            yHints[1] = marginY / viewHeight;
             dr.postTranslate((float) (marginX + resultW), (float) (marginY + resultH));
+            yHints[2] = (marginX + resultW) / viewHeight;
+            yHints[2] = (marginY + resultH) / viewHeight;
             dl.postTranslate((float) marginX, (float) (marginY + resultH));
+            yHints[3] = marginX / viewHeight;
+            yHints[3] = (marginY + resultH) / viewHeight;
 
             FrameOverlayView.this.invalidate();
         }
@@ -75,10 +94,20 @@ public class FrameOverlayView extends View {
             float dy = Math.abs(centerY - y);
 
             setupMatrices();
+            double viewWidth = underlyingView.getWidth();
+            double viewHeight = underlyingView.getHeight();
             ul.postTranslate((centerX - dx), (centerY - dy));
+            xHints[0] = (centerX - dx) / viewWidth;
+            yHints[0] = (centerY - dy) / viewHeight;
             ur.postTranslate((centerX + dx), (centerY - dy));
+            xHints[1] = (centerX + dx) / viewWidth;
+            yHints[1] = (centerY - dy) / viewHeight;
             dr.postTranslate((centerX + dx), (centerY + dy));
+            xHints[2] = (centerX + dx) / viewWidth;
+            yHints[2] = (centerY + dy) / viewHeight;
             dl.postTranslate((centerX - dx), (centerY + dy));
+            xHints[3] = (centerX - dx) / viewWidth;
+            yHints[3] = (centerY + dy) / viewHeight;
 
             FrameOverlayView.this.invalidate();
         }
@@ -126,19 +155,25 @@ public class FrameOverlayView extends View {
 
     @Override
     public void setLayoutParams(ViewGroup.LayoutParams params) {
-//        invalidate();
         frame.resizeToView(params.width, params.height);
         super.setLayoutParams(params);
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-        super.onSizeChanged(w, h, oldw, oldh);
         frame.resizeToView(w, h);
     }
 
     public void setFrameSizeOnTouch(float x, float y) {
         frame.resizeOnTouch(x, y);
+    }
+
+    public RelativePoint[] getCornersHints() {
+        RelativePoint[] result = new RelativePoint[4];
+        for (int i = 0; i < 4; i++) {
+            result[i] = new RelativePoint(frame.xHints[i], frame.yHints[i]);
+        }
+        return result;
     }
 }
 

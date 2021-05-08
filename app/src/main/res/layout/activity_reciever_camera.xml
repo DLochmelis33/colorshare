@@ -5,7 +5,7 @@
     android:id="@+id/ConstraintLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".ReceiverCameraActivity">
+    tools:context=".receiver.ReceiverCameraActivity">
 
     <LinearLayout
         android:id="@+id/linearLayout"
@@ -19,7 +19,7 @@
             android:layout_width="match_parent"
             android:layout_height="675dp">
 
-            <ru.hse.colorshare.CameraOverlaidView
+            <ru.hse.colorshare.receiver.CameraOverlaidView
                 android:id="@+id/cameraTextureView"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
@@ -28,7 +28,7 @@
                 android:focusableInTouchMode="true"
                 android:keepScreenOn="true" />
 
-            <ru.hse.colorshare.FrameOverlayView
+            <ru.hse.colorshare.receiver.FrameOverlayView
                 android:id="@+id/frameOverlayView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content" />

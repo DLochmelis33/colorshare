@@ -1,7 +1,8 @@
-package ru.hse.colorshare;
+package ru.hse.colorshare.receiver;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.os.Handler;
 import android.os.Message;
 import android.renderscript.Allocation;
@@ -92,9 +93,6 @@ public class ImageProcessor {
         out = Allocation.createTyped(rs, rgbaType.create(), Allocation.USAGE_SCRIPT);
         assert out != null;
 
-        // The allocations above "should" be cached if you are going to perform
-        // repeated conversion of YUV_420_888 to Bitmap.
-
         isInit = true;
     }
 
@@ -110,4 +108,8 @@ public class ImageProcessor {
         return bitmap;
     }
 
+
 }
+
+
+

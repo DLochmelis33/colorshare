@@ -1,4 +1,4 @@
-package ru.hse.colorshare;
+package ru.hse.colorshare.receiver;
 
 
 import android.Manifest;
@@ -30,6 +30,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+
+import ru.hse.colorshare.BuildConfig;
 
 public class CameraService {
 
@@ -82,7 +84,7 @@ public class CameraService {
             }
         }
         assert result != null; // ! studio told to
-        Log.d(TAG, "chosen size: " + result.getWidth() + "x" + result.getHeight() + " with eval=" + resultSizeEvaluation);
+        Log.d(TAG, "maxthroughput size: " + result.getWidth() + "x" + result.getHeight() + " with eval=" + resultSizeEvaluation);
         return result;
     }
 
@@ -137,6 +139,9 @@ public class CameraService {
                 Size preferredSize = chooseOptimalSizeMod(configurations.getOutputSizes(SurfaceTexture.class),
                         previewView.getWidth(), previewView.getHeight(),
                         calculateMaxThroughputSize(configurations));
+//                Size preferredSize = calculateMaxThroughputSize(configurations); // ! DO NOT
+//                preferredSize = new Size(1280, 720); // magic numbers
+
                 int sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
                 Log.d(TAG, "sensor orientation = " + sensorOrientation);
                 if (sensorOrientation == 90 || sensorOrientation == 270) {
@@ -204,7 +209,7 @@ public class CameraService {
 
                         Image image = imageReader.acquireLatestImage();
                         if (image == null) {
-                            Log.v(TAG, "null image");
+//                            Log.v(TAG, "null image");
                             return;
                         }
                         if (BuildConfig.DEBUG && image.getFormat() != IMAGE_FORMAT) {
@@ -222,6 +227,7 @@ public class CameraService {
                         ByteBuffer vuBuffer = image.getPlanes()[2].getBuffer();
                         int width = image.getWidth();
                         int height = image.getHeight();
+//                        Log.d(TAG, "imgw=" + width + " imgh=" + height);
                         int ySize = yBuffer.remaining();
                         int vuSize = vuBuffer.remaining();
                         byte[] nv21 = new byte[ySize + vuSize]; // ! ?
