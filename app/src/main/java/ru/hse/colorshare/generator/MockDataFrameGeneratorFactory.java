@@ -42,7 +42,8 @@ public class MockDataFrameGeneratorFactory {
         }
         if (generator == null) {
             generatorId++;
-            generator = new MockDataFrameGenerator(generatorId, params.getColorFrameSize(), 10);
+            int framesNumber = 10;
+            generator = new MockDataFrameGenerator(generatorId, params.getColorFrameSize(), framesNumber);
         }
         return generator;
     }

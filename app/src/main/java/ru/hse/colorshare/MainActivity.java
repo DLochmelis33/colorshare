@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
         intent.setType("*/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         try {
-            startActivityForResult(intent, RequestCode.PICK_FILE.value);
+            startActivityForResult(intent, RequestCode.PICK_FILE.ordinal());
         } catch (ActivityNotFoundException ex) {
             Toast.makeText(getApplicationContext(), "File Manager not found", Toast.LENGTH_SHORT).show();
         }
@@ -62,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
         }
         Intent intent = new Intent(this, TransmitterActivity.class);
         intent.putExtra("fileToSendUri", fileToSendInfo.uri);
-        startActivityForResult(intent, RequestCode.TRANSMIT_FILE.value);
+        startActivityForResult(intent, RequestCode.TRANSMIT_FILE.ordinal());
     }
 
     public void onClickTest(View view) {
@@ -79,7 +79,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCodeValue, int resultCodeValue,
                                     Intent resultData) {
         Log.d(LOG_TAG, "requestCodeValue = " + requestCodeValue + "; resultCodeValue = " + resultCodeValue);
-        RequestCode requestCode = RequestCode.valueOf(requestCodeValue);
+        RequestCode requestCode = RequestCode.values()[requestCodeValue];
         Log.d(LOG_TAG, "requestCode = " + requestCode);
         switch (requestCode) {
             case PICK_FILE:
@@ -93,9 +93,7 @@ public class MainActivity extends AppCompatActivity {
                 fileToSendInfo.uri = resultData.getData();
 
                 // get file name and size
-                Cursor cursor =
-                        getContentResolver().query(fileToSendInfo.uri, null, null, null, null);
-                try {
+                try (Cursor cursor = getContentResolver().query(fileToSendInfo.uri, null, null, null, null)) {
                     int nameIndex = cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME);
                     cursor.moveToFirst();
                     fileToSendInfo.name = cursor.getString(nameIndex);
@@ -104,19 +102,18 @@ public class MainActivity extends AppCompatActivity {
                     fileToSendInfo.uri = null;
                     break;
                 }
-                cursor.close();
                 Log.d(LOG_TAG, "File info: " + "name = " + fileToSendInfo.name + "; uri = " + fileToSendInfo.uri);
 
                 fileToSendTextView.setText(fileToSendInfo.name);
                 break;
             case TRANSMIT_FILE:
-                TransmissionResultCode resultCode = TransmissionResultCode.valueOf(resultCodeValue);
+                TransmissionResultCode resultCode = TransmissionResultCode.getCode(resultCodeValue);
                 Log.d(LOG_TAG, "resultCode = " + resultCode);
                 switch (resultCode) {
                     case SUCCEED:
                         Toast.makeText(getApplicationContext(), "File was successfully sent!", Toast.LENGTH_LONG).show();
                         break;
-                    case CANCELLED:
+                    case CANCELED:
                         break;
                     case FAILED_TO_READ_FILE:
                         Toast.makeText(getApplicationContext(), "File sending failed: failed to read file, try again", Toast.LENGTH_LONG).show();
@@ -158,30 +155,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private enum RequestCode {
-        PICK_FILE(2),
-        TRANSMIT_FILE(3);
-
-        private final int value;
-        private static final Map<Integer, RequestCode> map = new HashMap<>();
-
-        static {
-            for (RequestCode requestCode : RequestCode.values()) {
-                map.put(requestCode.value, requestCode);
-            }
-        }
-
-        RequestCode(int value) {
-            this.value = value;
-        }
-
-        public static RequestCode valueOf(int requestCodeValue) {
-            return map.get(requestCodeValue);
-        }
+        PICK_FILE,
+        TRANSMIT_FILE
     }
 
     public enum TransmissionResultCode {
         SUCCEED(Activity.RESULT_OK),
-        CANCELLED(Activity.RESULT_CANCELED),
+        CANCELED(Activity.RESULT_CANCELED),
         FAILED_TO_READ_FILE(4),
         FAILED_TO_GET_TRANSMISSION_PARAMS(5);
 
@@ -198,7 +178,7 @@ public class MainActivity extends AppCompatActivity {
             this.value = value;
         }
 
-        public static TransmissionResultCode valueOf(int resultCodeValue) {
+        public static TransmissionResultCode getCode(int resultCodeValue) {
             return map.get(resultCodeValue);
         }
     }

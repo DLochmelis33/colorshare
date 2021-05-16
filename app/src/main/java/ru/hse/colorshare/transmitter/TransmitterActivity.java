@@ -1,8 +1,8 @@
 package ru.hse.colorshare.transmitter;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -20,7 +20,6 @@ import android.view.View;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -28,6 +27,7 @@ import ru.hse.colorshare.MainActivity;
 import ru.hse.colorshare.generator.DataFrameGenerator;
 import ru.hse.colorshare.generator.MockDataFrameGeneratorFactory;
 
+@SuppressLint("Assert")
 public class TransmitterActivity extends AppCompatActivity {
 
     private TransmissionState state;
@@ -42,22 +42,8 @@ public class TransmitterActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        if (savedInstanceState != null) {
-            state = TransmissionState.values()[savedInstanceState.getInt("state")];
-            Log.d(LOG_TAG, "restored state: " + state);
-        } else {
-            state = TransmissionState.INITIAL;
-        }
-        // cancel because of params loss
-        // TODO: support restoring = save TransmitterActivity fields via ViewModel
-        if (!state.equals(TransmissionState.INITIAL)) {
-            setResult(MainActivity.TransmissionResultCode.CANCELLED.value, new Intent());
-            finish();
-            return;
-        }
-
         Uri fileToSendUri = getIntent().getParcelableExtra("fileToSendUri");
-        Log.d(LOG_TAG, "received intent: " + "uri = " + fileToSendUri);
+        Log.d(LOG_TAG, "received intent: uri = " + fileToSendUri);
 
         try {
             generatorFactory = new MockDataFrameGeneratorFactory(fileToSendUri, this);
@@ -66,6 +52,7 @@ public class TransmitterActivity extends AppCompatActivity {
             finish();
             return;
         }
+        state = TransmissionState.INITIAL;
 
         screenOrientation = getResources().getConfiguration().orientation;
 
@@ -104,12 +91,6 @@ public class TransmitterActivity extends AppCompatActivity {
         }
     }
 
-    protected void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putInt("state", state.ordinal());
-        Log.d(LOG_TAG, "save state = " + state);
-    }
-
     private class DrawView extends SurfaceView implements SurfaceHolder.Callback {
 
         private DrawThread drawThread;
@@ -122,43 +103,50 @@ public class TransmitterActivity extends AppCompatActivity {
         @Override
         public void surfaceChanged(SurfaceHolder holder, int format, int width,
                                    int height) {
-            Log.d(LOG_TAG, "surfaceChanged() was call");
+            Log.d(LOG_TAG, "surfaceChanged method was call");
         }
 
         @Override
         public void surfaceCreated(SurfaceHolder holder) {
             Log.d(LOG_TAG, "DrawView created, transmission state = " + state);
             setRequestedOrientation(screenOrientation);
+            assert !state.equals(TransmissionState.CREATING) && generatorFactory != null;
 
-            if (state.equals(TransmissionState.INITIAL)) {
-                try {
-                    params = getTransmissionParams();
-                } catch (IllegalStateException exc) {
-                    Log.d(LOG_TAG, "Getting transmission params failed: " + exc.getMessage());
-                    state = TransmissionState.FAILED;
-                    setResult(MainActivity.TransmissionResultCode.FAILED_TO_GET_TRANSMISSION_PARAMS.value, new Intent());
-                    finish();
-                    return;
-                }
-                generatorFactory.setParams(params);
+            // cancel because of params loss
+            // TODO: support restoring = save TransmitterActivity fields via ViewModel
+            if (!state.equals(TransmissionState.INITIAL)) {
+                setResult(MainActivity.TransmissionResultCode.CANCELED.value, new Intent());
+                finish();
+                return;
             }
-            if (params == null) {
-                throw new IllegalStateException("transmission params remain null in state " + state);
+
+            assert params == null && drawThread == null;
+            try {
+                params = evaluateTransmissionParams();
+            } catch (IllegalStateException exc) {
+                Log.d(LOG_TAG, "Evaluating transmission params failed: " + exc.getMessage());
+                state = TransmissionState.FAILED;
+                assert params == null && drawThread == null;
+                setResult(MainActivity.TransmissionResultCode.FAILED_TO_GET_TRANSMISSION_PARAMS.value, new Intent());
+                finish();
+                return;
             }
+            generatorFactory.setParams(params);
+            assert params != null;
             Log.d(LOG_TAG, "Transmissions params: " + params.toString());
 
             // start transmission
-            state = TransmissionState.STARTED;
             drawThread = new DrawThread(getHolder());
-            drawThread.setRunning(true);
+            state = TransmissionState.STARTED;
             drawThread.start();
         }
 
         @Override
         public void surfaceDestroyed(SurfaceHolder holder) {
             boolean retry = true;
-            if (drawThread != null) {
-                drawThread.setRunning(false);
+            if (state.equals(TransmissionState.STARTED) || state.equals(TransmissionState.FINISHED)) {
+                assert drawThread != null;
+                drawThread.setRunningFalse();
                 while (retry) {
                     try {
                         drawThread.join();
@@ -170,7 +158,7 @@ public class TransmitterActivity extends AppCompatActivity {
             Log.d(LOG_TAG, "DrawView destroyed");
         }
 
-        private TransmissionParams getTransmissionParams() throws IllegalStateException {
+        private TransmissionParams evaluateTransmissionParams() throws IllegalStateException {
             final Rect frameBounds = getHolder().getSurfaceFrame();
             int height = frameBounds.height() - 2 * TransmissionParams.BORDER_SIZE;
             int width = frameBounds.width() - 2 * TransmissionParams.BORDER_SIZE;
@@ -188,7 +176,7 @@ public class TransmitterActivity extends AppCompatActivity {
 
             // prepare to binary search
             if (!testReceiverAbilityToRead(maxUnitSize)) {
-                throw new IllegalStateException("receiver is unable to read maxUnitSize greed");
+                throw new IllegalStateException("receiver is unable to read maxUnitSize grid");
             }
             int left = minUnitSize; // non-inclusive
             int right = maxUnitSize; // inclusive
@@ -210,9 +198,9 @@ public class TransmitterActivity extends AppCompatActivity {
             int unitSize = right;
             int rows = height / unitSize;
             int cols = width / unitSize;
-            // center units greed
-            PointF leftTopPointOfGreed = new PointF((frameBounds.width() - cols * unitSize) / 2f, (frameBounds.height() - rows * unitSize) / 2f);
-            return new TransmissionParams(unitSize, rows, cols, leftTopPointOfGreed);
+            // center units grid
+            PointF leftTopPointOfGrid = new PointF((frameBounds.width() - cols * unitSize) / 2f, (frameBounds.height() - rows * unitSize) / 2f);
+            return new TransmissionParams(unitSize, rows, cols, leftTopPointOfGrid);
         }
 
         private boolean testReceiverAbilityToRead(int unitSize) {
@@ -222,24 +210,25 @@ public class TransmitterActivity extends AppCompatActivity {
 
         private class DrawThread extends Thread {
 
-            private boolean running = false;
-            private final WeakReference<SurfaceHolder> surfaceHolderWeakRef;
+            private boolean running = true;
+            private final SurfaceHolder surfaceHolder;
 
             private final Paint paint;
 
             public DrawThread(SurfaceHolder surfaceHolder) {
-                this.surfaceHolderWeakRef = new WeakReference<>(surfaceHolder);
+                this.surfaceHolder = surfaceHolder;
                 paint = new Paint();
             }
 
-            public void setRunning(boolean running) {
-                this.running = running;
+            public synchronized void setRunningFalse() {
+                running = false;
+                notify();
             }
 
             @Override
             public void run() {
                 Canvas canvas;
-                while (running) {
+                while (true) {
                     canvas = null;
                     DataFrameGenerator generator = generatorFactory.getDataFrameGenerator();
                     Log.d(LOG_TAG, "Generator info: " + generator.getInfo());
@@ -247,50 +236,58 @@ public class TransmitterActivity extends AppCompatActivity {
                         List<Integer> colors = generator.getNextDataFrame();
                         if (colors == null) {
                             state = TransmissionState.FINISHED;
+                            Log.d(LOG_TAG, "Transmission successfully finished!");
                             setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
                             finish();
                             return;
                         }
-                        canvas = surfaceHolderWeakRef.get().lockCanvas(null);
+                        canvas = surfaceHolder.lockCanvas(null);
                         if (canvas == null)
                             continue;
-                        synchronized (surfaceHolderWeakRef.get()) { // probably, synchronised is unnecessary
-                            canvas.drawColor(Color.BLACK);
-                            canvas.translate(params.leftTopOfGreed.x, params.leftTopOfGreed.y);
-                            canvas.save();
+                        canvas.drawColor(Color.BLACK);
+                        canvas.translate(params.leftTopOfGrid.x, params.leftTopOfGrid.y);
+                        canvas.save();
 
-                            int locatorMarkSize = LocatorMarkGraphic.SIDE_SIZE_IN_UNITS;
-                            int unitSize = params.unitSize;
+                        int locatorMarkSize = LocatorMarkGraphic.SIDE_SIZE_IN_UNITS;
+                        int unitSize = params.unitSize;
 
-                            // top stripe
-                            LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_TOP, unitSize);
-                            canvas.save();
-                            canvas.translate(locatorMarkSize * unitSize, 0);
-                            int stripeWidth = params.cols - 2 * locatorMarkSize; // in units
-                            int index = drawColorUnitsStripe(canvas, colors, 0, locatorMarkSize, stripeWidth);
-                            canvas.translate(stripeWidth * unitSize, 0);
-                            LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.RIGHT_TOP, unitSize);
-                            canvas.restore();
+                        // top stripe
+                        LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_TOP, unitSize);
+                        canvas.save();
+                        canvas.translate(locatorMarkSize * unitSize, 0);
+                        int stripeWidth = params.cols - 2 * locatorMarkSize; // in units
+                        int index = drawColorUnitsStripe(canvas, colors, 0, locatorMarkSize, stripeWidth);
+                        canvas.translate(stripeWidth * unitSize, 0);
+                        LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.RIGHT_TOP, unitSize);
+                        canvas.restore();
 
-                            // mid stripe
-                            canvas.translate(0, locatorMarkSize * unitSize);
-                            int stripeHeight = params.rows - 2 * locatorMarkSize;
-                            index = drawColorUnitsStripe(canvas, colors, index, stripeHeight, params.cols);
+                        // mid stripe
+                        canvas.translate(0, locatorMarkSize * unitSize);
+                        int stripeHeight = params.rows - 2 * locatorMarkSize;
+                        index = drawColorUnitsStripe(canvas, colors, index, stripeHeight, params.cols);
 
-                            // bottom stripe
-                            canvas.translate(0, stripeHeight * unitSize);
-                            LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_BOTTOM, unitSize);
-                            canvas.translate(locatorMarkSize * unitSize, 0);
-                            drawColorUnitsStripe(canvas, colors, index, locatorMarkSize, params.cols - locatorMarkSize);
+                        // bottom stripe
+                        canvas.translate(0, stripeHeight * unitSize);
+                        LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_BOTTOM, unitSize);
+                        canvas.translate(locatorMarkSize * unitSize, 0);
+                        drawColorUnitsStripe(canvas, colors, index, locatorMarkSize, params.cols - locatorMarkSize);
 
-                            canvas.restore();
-                        }
+                        canvas.restore();
                     } finally {
                         if (canvas != null) {
-                            surfaceHolderWeakRef.get().unlockCanvasAndPost(canvas);
+                            surfaceHolder.unlockCanvasAndPost(canvas);
                         }
                     }
-                    boolean response = waitForReceiverResponse();
+                    boolean response;
+                    synchronized (this) {
+                        if (!running) {
+                            break;
+                        }
+                        response = waitForReceiverResponse();
+                        if (!running) {
+                            break;
+                        }
+                    }
                     Log.d(LOG_TAG, "data frame #" + generator.getFrameIndex() +
                             " was successfully sent = " + response);
                     generator.setSuccess(response);
@@ -320,7 +317,7 @@ public class TransmitterActivity extends AppCompatActivity {
             private boolean waitForReceiverResponse() {
                 // currently is mock
                 try {
-                    TimeUnit.SECONDS.sleep(1);
+                    wait(TimeUnit.SECONDS.toMillis(1));
                 } catch (InterruptedException exc) {
                     return false;
                 }
@@ -330,6 +327,10 @@ public class TransmitterActivity extends AppCompatActivity {
     }
 
     private enum TransmissionState {
-        INITIAL, STARTED, FINISHED, FAILED
+        CREATING, // generatorFactory == null
+        INITIAL, // generatorFactory != null, params == null, drawThread == null
+        STARTED, // generatorFactory != null, params != null, drawThread != null
+        FINISHED, // happy path transmission is finished: still generatorFactory != null, params != null, drawThread != null
+        FAILED // after: now transmission can fail only at evaluating params => generatorFactory != null, params == null, drawThread == null
     }
 }

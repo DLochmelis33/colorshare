@@ -9,18 +9,18 @@ public final class TransmissionParams {
     public final int unitSize;
     public final int rows;
     public final int cols;
-    public final PointF leftTopOfGreed;
+    public final PointF leftTopOfGrid;
     public final Rect unitRect;
 
     public static final int EXPECTED_FRAME_SIZE_IN_UNITS = 200;
     public static final int BORDER_SIZE = 10;
     public static final int MIN_UNITS_IN_LINE = 2 * LocatorMarkGraphic.SIDE_SIZE_IN_UNITS; // locator marks must not overlap
 
-    public TransmissionParams(int unitSize, int rows, int cols, PointF leftTopOfGreed) throws IllegalStateException {
+    public TransmissionParams(int unitSize, int rows, int cols, PointF leftTopOfGrid) throws IllegalStateException {
         this.unitSize = unitSize;
         this.rows = rows;
         this.cols = cols;
-        this.leftTopOfGreed = leftTopOfGreed;
+        this.leftTopOfGrid = leftTopOfGrid;
         unitRect = new Rect(0, 0, unitSize, unitSize);
         getColorFrameSize();
     }
@@ -37,6 +37,6 @@ public final class TransmissionParams {
     public @NonNull
     String toString() {
         return "unit size = " + unitSize + "; rows = " + rows + "; cols = " + cols +
-                "; leftTopOfGreed = (" + leftTopOfGreed.x + ";" + leftTopOfGreed.y + ")";
+                "; leftTopOfGrid = (" + leftTopOfGrid.x + ";" + leftTopOfGrid.y + ")";
     }
 }
