@@ -30,7 +30,6 @@ public class FileDataFrameGenerator extends AbstractDataFrameGenerator {
 
     private InputStream stream;
 
-
     private RawDataPreprocessor preprocessor;
     private ColorDataFrameCreator creator;
 

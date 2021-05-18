@@ -1,15 +1,24 @@
 package ru.hse.colorshare.generator.creator;
 
+import java.util.Objects;
 import java.util.zip.Checksum;
 
+import static ru.hse.colorshare.generator.creator.FourColorsDataFrameUtil.FROM_BITS;
 import static ru.hse.colorshare.generator.creator.FourColorsDataFrameUtil.UNITS_PER_BYTE;
 import static ru.hse.colorshare.generator.creator.FourColorsDataFrameUtil.EMPTY_COLOR;
 import static ru.hse.colorshare.generator.creator.FourColorsDataFrameUtil.BITS_PER_UNIT;
-import static ru.hse.colorshare.generator.creator.FourColorsDataFrameUtil.writeByteAsColors;
 
 public class FourColorsDataFrameCreator extends AbstractColorDataFrameCreator {
     public FourColorsDataFrameCreator(int unitsPerFrame, int framesPerBulk, Checksum checksum) {
         super(unitsPerFrame, framesPerBulk, checksum);
+    }
+
+    private void writeByteAsColors(int[] colors, int offset, byte toEncode) {
+        for (int unit = 0; unit < UNITS_PER_BYTE; unit++, toEncode >>= BITS_PER_UNIT) {
+            Integer color = FROM_BITS.get(toEncode & ((1 << BITS_PER_UNIT) - 1));
+            Objects.requireNonNull(color);
+            colors[offset + unit] = color;
+        }
     }
 
     @Override

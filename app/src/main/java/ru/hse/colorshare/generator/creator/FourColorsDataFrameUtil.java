@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.IntBinaryOperator;
+import java.util.function.IntUnaryOperator;
 
 public class FourColorsDataFrameUtil {
     public static final class FourColorUnit {
@@ -24,6 +26,7 @@ public class FourColorsDataFrameUtil {
     public static final int UNITS_PER_BYTE = Byte.SIZE / BITS_PER_UNIT;
 
     public static final Map<Integer, Integer> FROM_BITS = new HashMap<>();
+    public static final Map<Integer, Integer> FROM_COLORS = new HashMap<>();
 
     public static final List<FourColorUnit> ALL_TWO_BIT_UNITS = Arrays.asList(
             new FourColorUnit(Color.BLUE, 0b00),
@@ -36,16 +39,11 @@ public class FourColorsDataFrameUtil {
     static {
         for (FourColorUnit unit : ALL_TWO_BIT_UNITS) {
             FROM_BITS.put(unit.encodedValue, unit.color);
+            FROM_COLORS.put(unit.color, unit.encodedValue);
         }
     }
 
-    public static void writeByteAsColors(int[] colors, int offset, byte toEncode) {
-        for (int unit = 0; unit < Byte.SIZE / BITS_PER_UNIT; unit++, toEncode >>= BITS_PER_UNIT) {
-            Integer color = FROM_BITS.get(toEncode & ((1 << BITS_PER_UNIT) - 1));
-            Objects.requireNonNull(color);
-            colors[offset + unit] = color;
-        }
-    }
+
 
     // TODO
     public static byte readColorsAsByte(int[] colors, int offset) {
