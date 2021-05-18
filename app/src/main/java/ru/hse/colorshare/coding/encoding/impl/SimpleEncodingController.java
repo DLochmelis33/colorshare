@@ -1,4 +1,4 @@
-package ru.hse.colorshare.generator;
+package ru.hse.colorshare.coding.encoding.impl;
 
 import android.content.Context;
 import android.net.Uri;
@@ -9,16 +9,15 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.zip.CRC32;
 
-import ru.hse.colorshare.generator.creator.DataFrameBulk;
-import ru.hse.colorshare.generator.creator.ColorDataFrame;
-import ru.hse.colorshare.generator.creator.FourColorsDataFrameEncoder;
-import ru.hse.colorshare.generator.creator.DataFrameEncoder;
-import ru.hse.colorshare.generator.preprocessor.FileEncodingPreprocessor;
-import ru.hse.colorshare.generator.preprocessor.EncodingPreprocessor;
+import ru.hse.colorshare.coding.encoding.ColorDataFrame;
+import ru.hse.colorshare.coding.encoding.DataFrameBulk;
+import ru.hse.colorshare.coding.encoding.DataFrameEncoder;
+import ru.hse.colorshare.coding.encoding.EncodingController;
+import ru.hse.colorshare.coding.exceptions.EncodingException;
+import ru.hse.colorshare.coding.encoding.EncodingPreprocessor;
 import ru.hse.colorshare.transmitter.TransmissionParams;
 
 /*
-    Основная логика кодирования файла.
     Можно налету подменить переводчика в цвета или предобработчика в зависимости от параметров передачи.
  */
 
@@ -38,7 +37,7 @@ public class SimpleEncodingController implements EncodingController {
     public SimpleEncodingController(InputStream stream, long streamLength) {
         this.stream = stream;
         buffer = ByteBuffer.allocate(4096);
-        preprocessor = new FileEncodingPreprocessor(stream, streamLength);
+        preprocessor = new SimpleEncodingPreprocessor(stream, streamLength);
     }
 
     public SimpleEncodingController(InputStream stream, long fileLength, int unitsPerFrame, int framesPerBulk) {
@@ -63,19 +62,19 @@ public class SimpleEncodingController implements EncodingController {
     }
 
     @Override
-    public DataFrameBulk getNextBulk() throws GenerationException {
+    public DataFrameBulk getNextBulk() throws EncodingException {
         try {
             if (preprocessor.left() <= 0) {
                 return null;
             }
         } catch (IOException e) {
-            throw new GenerationException(e);
+            throw new EncodingException(e);
         }
 
         try {
             preprocessor.readBytes(buffer, colorEncoder.estimateBufferSize() * framesPerBulk);
         } catch (IOException e) {
-            throw new GenerationException(e);
+            throw new EncodingException(e);
         }
 
         buffer.flip();
@@ -94,11 +93,11 @@ public class SimpleEncodingController implements EncodingController {
     }
 
     @Override
-    public long estimateSize() throws GenerationException {
+    public long estimateSize() throws EncodingException {
         try {
             return preprocessor.left();
         } catch (IOException e) {
-            throw new GenerationException(e);
+            throw new EncodingException(e);
         }
     }
 

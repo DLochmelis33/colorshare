@@ -1,7 +1,7 @@
-package ru.hse.colorshare.generator.creator;
+package ru.hse.colorshare.coding.encoding;
 
 /*
-    Здесь возможна дополнительная информация
+    Класс, описывающий массив дата фрэймов.
  */
 
 public class DataFrameBulk {

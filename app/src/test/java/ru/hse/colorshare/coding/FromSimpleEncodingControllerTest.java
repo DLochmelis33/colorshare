@@ -9,10 +9,10 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import ru.hse.colorshare.generator.creator.ColorDataFrame;
-import ru.hse.colorshare.generator.EncodingController;
-import ru.hse.colorshare.generator.SimpleEncodingController;
-import ru.hse.colorshare.generator.GenerationException;
+import ru.hse.colorshare.coding.encoding.ColorDataFrame;
+import ru.hse.colorshare.coding.encoding.EncodingController;
+import ru.hse.colorshare.coding.encoding.impl.SimpleEncodingController;
+import ru.hse.colorshare.coding.exceptions.EncodingException;
 
 import static ru.hse.colorshare.coding.TestUtils.colorsFromBytes;
 
@@ -20,7 +20,7 @@ public class FromSimpleEncodingControllerTest {
     Path resourceDirectory = Paths.get("src", "test", "resources");
 
     @Test
-    public void testSimple() throws IOException, GenerationException {
+    public void testSimple() throws IOException, EncodingException {
         InputStream file = new FileInputStream(resourceDirectory.resolve("testSimple").toFile());
         EncodingController generator = new SimpleEncodingController(file, 3, 10, 2);
         ColorDataFrame[] bulk = generator.getNextBulk().getDataFrames();

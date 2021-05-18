@@ -24,9 +24,9 @@ import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 
 import ru.hse.colorshare.MainActivity;
-import ru.hse.colorshare.generator.EncodingController;
-import ru.hse.colorshare.generator.SimpleEncodingController;
-import ru.hse.colorshare.generator.GenerationException;
+import ru.hse.colorshare.coding.encoding.EncodingController;
+import ru.hse.colorshare.coding.encoding.impl.SimpleEncodingController;
+import ru.hse.colorshare.coding.exceptions.EncodingException;
 
 public class TransmitterActivity extends AppCompatActivity {
 
@@ -254,7 +254,7 @@ public class TransmitterActivity extends AppCompatActivity {
                         int[] colors = new int[0];
                         try {
                             colors = controller.getNextBulk().getDataFrames()[0].getColors();
-                        } catch (GenerationException e) {
+                        } catch (EncodingException e) {
                             e.printStackTrace();
                         }
                         if (colors == null) {

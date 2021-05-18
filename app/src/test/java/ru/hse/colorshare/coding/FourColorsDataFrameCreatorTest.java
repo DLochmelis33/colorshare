@@ -5,9 +5,9 @@ import org.junit.Test;
 
 import java.nio.ByteBuffer;
 
-import ru.hse.colorshare.generator.creator.ColorDataFrame;
-import ru.hse.colorshare.generator.creator.FourColorsDataFrameEncoder;
-import ru.hse.colorshare.generator.creator.DataFrameEncoder;
+import ru.hse.colorshare.coding.encoding.ColorDataFrame;
+import ru.hse.colorshare.coding.encoding.impl.FourColorsDataFrameEncoder;
+import ru.hse.colorshare.coding.encoding.DataFrameEncoder;
 
 import static ru.hse.colorshare.coding.TestUtils.colorsFromBytes;
 

@@ -1,4 +1,6 @@
-package ru.hse.colorshare.generator.creator;
+package ru.hse.colorshare.coding.encoding.impl;
+
+import ru.hse.colorshare.coding.encoding.ColorDataFrame;
 
 public class SimpleColorDataFrame implements ColorDataFrame {
     protected final int[] colors;
@@ -12,11 +14,6 @@ public class SimpleColorDataFrame implements ColorDataFrame {
     @Override
     public long getChecksum() {
         return checksum;
-    }
-
-    @Override
-    public int[] getChecksumAsColors() {
-        throw new UnsupportedOperationException();
     }
 
     @Override

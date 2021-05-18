@@ -10,15 +10,15 @@ import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import ru.hse.colorshare.generator.preprocessor.FileEncodingPreprocessor;
-import ru.hse.colorshare.generator.preprocessor.EncodingPreprocessor;
+import ru.hse.colorshare.coding.encoding.impl.SimpleEncodingPreprocessor;
+import ru.hse.colorshare.coding.encoding.EncodingPreprocessor;
 
-public class FileEncodingPreprocessorTest {
+public class SimpleEncodingPreprocessorTest {
     private final Path resourceDirectory = Paths.get("src", "test", "resources");
 
     private EncodingPreprocessor getProcessor(String filename, long fileLength) throws FileNotFoundException {
         InputStream file = new FileInputStream(resourceDirectory.resolve("testSimple").toFile());
-        return new FileEncodingPreprocessor(file, fileLength);
+        return new SimpleEncodingPreprocessor(file, fileLength);
     }
 
     @Test

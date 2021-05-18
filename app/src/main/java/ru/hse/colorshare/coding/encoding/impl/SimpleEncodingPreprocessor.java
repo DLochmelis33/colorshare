@@ -1,10 +1,12 @@
-package ru.hse.colorshare.generator.preprocessor;
+package ru.hse.colorshare.coding.encoding.impl;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 
-public class FileEncodingPreprocessor implements EncodingPreprocessor {
+import ru.hse.colorshare.coding.encoding.EncodingPreprocessor;
+
+public class SimpleEncodingPreprocessor implements EncodingPreprocessor {
     private static final int MAX_BUFFER_SIZE = 4096;
     private final InputStream stream;
     private final long fileLength;
@@ -12,7 +14,7 @@ public class FileEncodingPreprocessor implements EncodingPreprocessor {
 
     private final byte[] innerBuffer = new byte[MAX_BUFFER_SIZE];
 
-    public FileEncodingPreprocessor(InputStream stream, long fileLength) {
+    public SimpleEncodingPreprocessor(InputStream stream, long fileLength) {
         this.stream = stream;
         this.fileLength = fileLength;
     }

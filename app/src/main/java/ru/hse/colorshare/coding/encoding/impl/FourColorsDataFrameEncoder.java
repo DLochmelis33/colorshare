@@ -1,13 +1,16 @@
-package ru.hse.colorshare.generator.creator;
+package ru.hse.colorshare.coding.encoding.impl;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.zip.Checksum;
 
-import static ru.hse.colorshare.generator.creator.FourColorsDataFrameUtil.BITS_PER_UNIT;
-import static ru.hse.colorshare.generator.creator.FourColorsDataFrameUtil.EMPTY_COLOR;
-import static ru.hse.colorshare.generator.creator.FourColorsDataFrameUtil.FROM_BITS;
-import static ru.hse.colorshare.generator.creator.FourColorsDataFrameUtil.UNITS_PER_BYTE;
+import ru.hse.colorshare.coding.encoding.ColorDataFrame;
+import ru.hse.colorshare.coding.encoding.DataFrameEncoder;
+
+import static ru.hse.colorshare.coding.util.FourColorsDataFrameUtil.BITS_PER_UNIT;
+import static ru.hse.colorshare.coding.util.FourColorsDataFrameUtil.EMPTY_COLOR;
+import static ru.hse.colorshare.coding.util.FourColorsDataFrameUtil.FROM_BITS;
+import static ru.hse.colorshare.coding.util.FourColorsDataFrameUtil.UNITS_PER_BYTE;
 
 
 public class FourColorsDataFrameEncoder implements DataFrameEncoder {

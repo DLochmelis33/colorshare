@@ -1,4 +1,4 @@
-package ru.hse.colorshare.generator.creator;
+package ru.hse.colorshare.coding.encoding;
 
 /*
     Description of a data structure which is transferring to VIEW
@@ -6,8 +6,6 @@ package ru.hse.colorshare.generator.creator;
 
 public interface ColorDataFrame {
     long getChecksum();
-
-    int[] getChecksumAsColors();
 
     int[] getColors();
 }

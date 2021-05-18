@@ -1,4 +1,4 @@
-package ru.hse.colorshare.generator.creator;
+package ru.hse.colorshare.coding.util;
 
 import android.graphics.Color;
 

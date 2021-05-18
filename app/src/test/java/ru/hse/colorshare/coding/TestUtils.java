@@ -3,7 +3,7 @@ package ru.hse.colorshare.coding;
 import java.util.Map;
 import java.util.zip.Checksum;
 
-import ru.hse.colorshare.generator.creator.FourColorsDataFrameUtil;
+import ru.hse.colorshare.coding.util.FourColorsDataFrameUtil;
 
 public class TestUtils {
 

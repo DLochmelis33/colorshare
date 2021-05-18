@@ -1,4 +1,4 @@
-package ru.hse.colorshare.generator.preprocessor;
+package ru.hse.colorshare.coding.encoding;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
