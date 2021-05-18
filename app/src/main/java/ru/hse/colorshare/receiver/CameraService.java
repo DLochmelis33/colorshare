@@ -43,11 +43,11 @@ public class CameraService {
     private CaptureRequest.Builder captureRequestBuilder;
     public static final int IMAGE_FORMAT = ImageFormat.YUV_420_888;
 
-    private final Activity startingActivity;
+    private final ReceiverCameraActivity startingActivity;
     private final TextureView previewView;
     private ImageReader imageReader;
 
-    public CameraService(CameraManager manager, Activity startingActivity, TextureView previewView) {
+    public CameraService(CameraManager manager, ReceiverCameraActivity startingActivity, TextureView previewView) {
         this.manager = manager;
         this.cameraDevice = null;
         cameraId = null;
@@ -234,7 +234,7 @@ public class CameraService {
                         yBuffer.get(nv21, 0, ySize);
                         vuBuffer.get(nv21, ySize, vuSize);
                         image.close(); // ASAP
-                        ImageProcessor.getInstance().EXECUTOR.execute(new ImageProcessor.Task(nv21, width, height, ReceiverCameraActivity.getReadingStatusHandler()));
+                        ImageProcessor.process(new ImageProcessor.Task(nv21, width, height, startingActivity.getHints(), startingActivity.getReceivingStatusHandler()));
                     }
 
                     @Override

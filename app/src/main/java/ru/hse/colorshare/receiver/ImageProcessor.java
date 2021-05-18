@@ -2,7 +2,7 @@ package ru.hse.colorshare.receiver;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.Color;
+import android.graphics.Point;
 import android.os.Handler;
 import android.os.Message;
 import android.renderscript.Allocation;
@@ -10,9 +10,16 @@ import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
+import android.util.Log;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import ru.hse.colorshare.util.RelativePoint;
 
 public class ImageProcessor {
 
@@ -23,16 +30,19 @@ public class ImageProcessor {
         private final Handler resultHandler;
         private final byte[] imageBytes;
         private final int width, height;
+        private final RelativePoint[] hints;
 
-        public Task(byte[] imageBytes, int width, int height, Handler resultHandler) {
+        public Task(byte[] imageBytes, int width, int height, RelativePoint[] hints, Handler resultHandler) {
             this.imageBytes = imageBytes;
             this.resultHandler = resultHandler;
             this.width = width;
             this.height = height;
+            this.hints = hints;
         }
 
         @Override
         public void run() {
+            long time = System.currentTimeMillis();
             if (!ImageProcessor.getInstance().isInit) {
                 ImageProcessor.getInstance().init(width, height, imageBytes.length);
             }
@@ -40,9 +50,16 @@ public class ImageProcessor {
                 throw new IllegalStateException("ImageProcessor parameters cannot change");
             }
             Bitmap bitmap = ImageProcessor.getInstance().yuv420ToBitmap(imageBytes);
+
+            ColorExtractor.LocatorResult[] locators = ColorExtractor.findLocators(bitmap, hints);
+//            ArrayList<Integer> colors = ColorExtractor.extractColors(bitmap, hints);
+
+
             // TODO
-            Message msg = Message.obtain(resultHandler, 0, String.format("#%06X", (0xFFFFFF & bitmap.getPixel(0, 0))));
+            Message msg = Message.obtain(resultHandler, 0, Arrays.toString(locators));
+            // String.format("#%06X", (0xFFFFFF & bitmap.getPixel(0, 0)))
             msg.sendToTarget();
+            Log.w(TAG, "ms=" + (System.currentTimeMillis() - time));
         }
     }
 
@@ -55,8 +72,12 @@ public class ImageProcessor {
         return instance;
     }
 
+    public static void process(Task t) {
+        getInstance().executor.execute(t);
+    }
+
     private final int poolSize = 5; // ! needs testing
-    public final ExecutorService EXECUTOR = Executors.newFixedThreadPool(poolSize);
+    public final Executor executor = Executors.newFixedThreadPool(poolSize);
 
     private Context context = null;
 
@@ -107,7 +128,6 @@ public class ImageProcessor {
         assert bitmap != null;
         return bitmap;
     }
-
 
 }
 

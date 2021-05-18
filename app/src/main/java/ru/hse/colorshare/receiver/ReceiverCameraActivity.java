@@ -23,19 +23,21 @@ import java.util.Comparator;
 
 import ru.hse.colorshare.BuildConfig;
 import ru.hse.colorshare.R;
+import ru.hse.colorshare.util.RelativePoint;
 
 public class ReceiverCameraActivity extends AppCompatActivity {
 
-    private CameraService cameraService;
-    private TextView dummyTextView;
-
     private static final String TAG = "ReceiverCameraActivity";
 
-    public static Handler getReadingStatusHandler() {
-        return readingStatusHandler;
+    private CameraService cameraService;
+    private TextView dummyTextView;
+    private FrameOverlayView frameOverlayView;
+
+    public Handler getReceivingStatusHandler() {
+        return receivingStatusHandler;
     }
 
-    private static Handler readingStatusHandler;
+    private Handler receivingStatusHandler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,14 +50,14 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         }
 
         CameraOverlaidView cameraTextureView = findViewById(R.id.cameraTextureView);
-        FrameOverlayView frameOverlayView = findViewById(R.id.frameOverlayView);
+        frameOverlayView = findViewById(R.id.frameOverlayView);
         cameraTextureView.setOverlayView(frameOverlayView);
         frameOverlayView.setUnderlyingView(cameraTextureView);
 
         dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
         cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView);
 
-        readingStatusHandler = new Handler(Looper.myLooper()) {
+        receivingStatusHandler = new Handler(Looper.myLooper()) {
             @Override
             public void handleMessage(Message msg) {
                 dummyTextView.setText(String.valueOf(msg.obj));
@@ -111,6 +113,10 @@ public class ReceiverCameraActivity extends AppCompatActivity {
 //        ImageProcessor.getInstance().EXECUTOR.shutdownNow();
     }
 
+    public RelativePoint[] getHints() {
+        return frameOverlayView.getCornersHints();
+    }
+
     // returns a camera that 1) is not monochrome 2) is of largest sensor area
     private String chooseCamera() {
         try {
@@ -121,11 +127,12 @@ public class ReceiverCameraActivity extends AppCompatActivity {
                 CameraCharacteristics cameraCharacteristics = manager.getCameraCharacteristics(cameraId);
 
                 boolean isFacingBack = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK;
-                boolean isNotMono = true;
-                if(cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT) != null && cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT) == CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_MONO) {
-                    isNotMono = false;
+                boolean isMono = false;
+                if (cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT) != null
+                        && cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT) == CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_MONO) {
+                    isMono = true;
                 }
-                if (isFacingBack && isNotMono) {
+                if (isFacingBack && !isMono) {
                     if (bestCameraId == null) {
                         bestCameraId = cameraId;
                     }
