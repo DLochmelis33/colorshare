@@ -32,7 +32,7 @@ public class TransmitterActivity extends AppCompatActivity {
 
     private TransmissionState state;
     private TransmissionParams params;
-    private EncodingController generator;
+    private EncodingController controller;
 
     private int screenOrientation;
 
@@ -66,7 +66,7 @@ public class TransmitterActivity extends AppCompatActivity {
         }
 
         try {
-            generator = new SimpleEncodingController(fileToSendUri, this);
+            controller = new SimpleEncodingController(fileToSendUri, this);
         } catch (FileNotFoundException exc) {
             Log.d(LOG_TAG, exc.getMessage());
             setResult(MainActivity.TransmissionResultCode.FAILED_TO_READ_FILE.value, new Intent());
@@ -148,7 +148,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     finish();
                     return;
                 }
-                generator.setTransmissionParameters(params);
+                controller.setTransmissionParameters(params);
             }
             if (params == null) {
                 throw new IllegalStateException("transmission params remain null in state " + state);
@@ -249,11 +249,11 @@ public class TransmitterActivity extends AppCompatActivity {
                 Canvas canvas;
                 while (running) {
                     canvas = null;
-                    Log.d(LOG_TAG, "Generator info: " + generator.getInfo());
+                    Log.d(LOG_TAG, "Generator info: " + controller.getInfo());
                     try {
                         int[] colors = new int[0];
                         try {
-                            colors = generator.getNextBulk().getDataFrames()[0].getColors();
+                            colors = controller.getNextBulk().getDataFrames()[0].getColors();
                         } catch (GenerationException e) {
                             e.printStackTrace();
                         }
@@ -304,7 +304,7 @@ public class TransmitterActivity extends AppCompatActivity {
                         }
                     }
                     boolean response = waitForReceiverResponse();
-                    Log.d(LOG_TAG, "data frame #" + generator.getBulkIndex() +
+                    Log.d(LOG_TAG, "data frame #" + controller.getBulkIndex() +
                             " was successfully sent = " + response);
                 }
             }
