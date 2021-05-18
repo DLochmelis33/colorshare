@@ -1,5 +1,6 @@
 package ru.hse.colorshare.transmitter;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.annotation.SuppressLint;
@@ -20,7 +21,6 @@ import android.view.View;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import ru.hse.colorshare.MainActivity;
@@ -43,10 +43,16 @@ public class TransmitterActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         Uri fileToSendUri = getIntent().getParcelableExtra("fileToSendUri");
-        Log.d(LOG_TAG, "received intent: uri = " + fileToSendUri);
+        Log.d(LOG_TAG, "received intent: " + "uri = " + fileToSendUri);
 
         try {
-            generatorFactory = new MockDataFrameGeneratorFactory(fileToSendUri, this);
+            Log.d(LOG_TAG, Integer.toString(getContentResolver().openInputStream(fileToSendUri).read()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            controller = new SimpleEncodingController(fileToSendUri, this);
         } catch (FileNotFoundException exc) {
             setResult(MainActivity.TransmissionResultCode.FAILED_TO_READ_FILE.value, new Intent());
             finish();
@@ -82,13 +88,14 @@ public class TransmitterActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        try {
+       /* try {
             if (generatorFactory != null) {
-                generatorFactory.finish();
+                // generatorFactory.finish();
             }
         } catch (IOException exc) {
             throw new RuntimeException("Transmission file failed to close", exc);
         }
+        */
     }
 
     private class DrawView extends SurfaceView implements SurfaceHolder.Callback {
@@ -294,7 +301,7 @@ public class TransmitterActivity extends AppCompatActivity {
                 }
             }
 
-            private int drawColorUnitsStripe(Canvas canvas, List<Integer> colors, int startIndex, int stripeHeight, int stripeWidth) {
+            private int drawColorUnitsStripe(Canvas canvas, int[] colors, int startIndex, int stripeHeight, int stripeWidth) {
                 // startIndex inclusive; stripeHeight and stripeWidth in units
                 paint.setStyle(Paint.Style.FILL);
                 int index = startIndex;
@@ -302,7 +309,7 @@ public class TransmitterActivity extends AppCompatActivity {
                 for (int i = 0; i < stripeHeight; i++) {
                     canvas.save();
                     for (int j = 0; j < stripeWidth; j++) {
-                        paint.setColor(colors.get(index));
+                        paint.setColor(colors[index]);
                         canvas.drawRect(params.unitRect, paint);
                         canvas.translate(params.unitSize, 0);
                         index++;
