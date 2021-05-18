@@ -1,6 +1,6 @@
-package ru.hse.colorshare.receiver;
+package ru.hse.colorshare.coding.decoding;
 
-public interface BulkDecoder {
+public interface DecodingController {
     void setBulkChecksums(long[] checksums);
 
     boolean isBulkEncoded();

@@ -1,4 +1,4 @@
-package ru.hse.colorshare.receiver;
+package ru.hse.colorshare.coding.decoding;
 
 public class DecodingColorsResult {
     public final byte[] encodedBytes;
