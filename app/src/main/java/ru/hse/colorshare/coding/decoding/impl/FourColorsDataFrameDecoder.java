@@ -64,4 +64,9 @@ public class FourColorsDataFrameDecoder implements ColorDataFrameDecoder {
         checksum.update(decodedBytes, 0, decodedBytes.length);
         return new SimpleByteDataFrame(decodedBytes, checksum.getValue());
     }
+
+    @Override
+    public int estimateBufferSize(int colorsCount) {
+        return colorsCount / UNITS_PER_BYTE;
+    }
 }
