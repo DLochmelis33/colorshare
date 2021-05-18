@@ -40,11 +40,7 @@ public class FourColorsDataFrameUtil {
     }
 
     public static void writeByteAsColors(int[] colors, int offset, byte toEncode) {
-        for (int unit = 0; unit < Byte.SIZE / BITS_PER_UNIT; unit++, toEncode >>= BITS_PER_UNIT) {
-            Integer color = FROM_BITS.get(toEncode & ((1 << BITS_PER_UNIT) - 1));
-            Objects.requireNonNull(color);
-            colors[offset + unit] = color;
-        }
+
     }
 
     // TODO

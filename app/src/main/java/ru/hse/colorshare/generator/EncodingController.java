@@ -2,7 +2,7 @@ package ru.hse.colorshare.generator;
 
 import java.io.Closeable;
 
-import ru.hse.colorshare.generator.creator.BulkColorDataFrames;
+import ru.hse.colorshare.generator.creator.DataFrameBulk;
 import ru.hse.colorshare.transmitter.TransmissionParams;
 
 /*
@@ -15,13 +15,10 @@ import ru.hse.colorshare.transmitter.TransmissionParams;
         - When there is no more data to transmit get returns NULL.
  */
 
-public interface DataFrameGenerator extends Closeable {
+public interface EncodingController extends Closeable {
 
     // get next data frame
-    BulkColorDataFrames getNextBulk() throws GenerationException;
-
-    // set success on last bulk sending
-    void setSuccess(boolean result) throws GenerationException;
+    DataFrameBulk getNextBulk() throws GenerationException;
 
     // @return approximate count of bulks left
     long estimateSize() throws GenerationException;

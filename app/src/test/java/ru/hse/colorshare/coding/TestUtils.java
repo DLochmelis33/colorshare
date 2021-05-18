@@ -40,7 +40,7 @@ public class TestUtils {
 
         @Override
         public void update(int b) {
-
+            value += b;
         }
 
         @Override

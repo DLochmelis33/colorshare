@@ -4,11 +4,11 @@ package ru.hse.colorshare.generator.creator;
     Здесь возможна дополнительная информация
  */
 
-public class BulkColorDataFrames {
+public class DataFrameBulk {
     private final ColorDataFrame[] bulk;
     private int current = 0;
 
-    public BulkColorDataFrames(ColorDataFrame[] bulk) {
+    public DataFrameBulk(ColorDataFrame[] bulk) {
         this.bulk = bulk;
     }
 

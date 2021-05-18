@@ -2,21 +2,19 @@ package ru.hse.colorshare.generator;
 
 import android.content.Context;
 import android.net.Uri;
-import android.util.Log;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.RandomAccessFile;
-import java.util.Arrays;
+import java.nio.ByteBuffer;
 import java.util.zip.CRC32;
 
-import ru.hse.colorshare.generator.creator.CreationResult;
-import ru.hse.colorshare.generator.creator.FourColorsDataFrameCreator;
-import ru.hse.colorshare.generator.creator.ColorDataFrameCreator;
-import ru.hse.colorshare.generator.preprocessor.FileRawDataPreprocessor;
-import ru.hse.colorshare.generator.preprocessor.RawDataPreprocessor;
+import ru.hse.colorshare.generator.creator.DataFrameBulk;
+import ru.hse.colorshare.generator.creator.ColorDataFrame;
+import ru.hse.colorshare.generator.creator.FourColorsDataFrameEncoder;
+import ru.hse.colorshare.generator.creator.DataFrameEncoder;
+import ru.hse.colorshare.generator.preprocessor.FileEncodingPreprocessor;
+import ru.hse.colorshare.generator.preprocessor.EncodingPreprocessor;
 import ru.hse.colorshare.transmitter.TransmissionParams;
 
 /*
@@ -24,75 +22,75 @@ import ru.hse.colorshare.transmitter.TransmissionParams;
     Можно налету подменить переводчика в цвета или предобработчика в зависимости от параметров передачи.
  */
 
-public class FileDataFrameGenerator extends AbstractDataFrameGenerator {
+public class SimpleEncodingController implements EncodingController {
     private int unitsPerFrame;
     private int framesPerBulk;
 
-    private InputStream stream;
+    private int currentBulk = 0;
 
+    private final InputStream stream;
 
-    private RawDataPreprocessor preprocessor;
-    private ColorDataFrameCreator creator;
+    private EncodingPreprocessor preprocessor;
+    private DataFrameEncoder colorEncoder;
 
-    private byte[] buffer;
+    private final ByteBuffer buffer;
 
-    public FileDataFrameGenerator(InputStream stream, long streamLength) {
+    public SimpleEncodingController(InputStream stream, long streamLength) {
         this.stream = stream;
-        preprocessor = new FileRawDataPreprocessor(stream, streamLength, 4096);
+        buffer = ByteBuffer.allocate(4096);
+        preprocessor = new FileEncodingPreprocessor(stream, streamLength);
     }
 
-    public FileDataFrameGenerator(InputStream stream, long fileLength, int unitsPerFrame, int framesPerBulk) {
+    public SimpleEncodingController(InputStream stream, long fileLength, int unitsPerFrame, int framesPerBulk) {
         this(stream, fileLength);
         setTransmissionParameters(unitsPerFrame, framesPerBulk);
     }
 
-    public FileDataFrameGenerator(Uri uri, Context context) throws FileNotFoundException {
+    public SimpleEncodingController(Uri uri, Context context) throws FileNotFoundException {
         this(
                 context.getContentResolver().openInputStream(uri),
                 context.getContentResolver().openFileDescriptor(uri, "r").getStatSize()
         );
     }
 
-    public FileDataFrameGenerator(Uri uri, Context context, int unitsPerFrame, int framesPerBulk) throws FileNotFoundException {
+    public SimpleEncodingController(Uri uri, Context context, int unitsPerFrame, int framesPerBulk) throws FileNotFoundException {
         this(uri, context);
         setTransmissionParameters(unitsPerFrame, framesPerBulk);
     }
 
     private void changeCreator() {
-        creator = new FourColorsDataFrameCreator(unitsPerFrame, framesPerBulk, new CRC32());
-        buffer = new byte[creator.estimateBufferSize()];
+        colorEncoder = new FourColorsDataFrameEncoder(unitsPerFrame, new CRC32());
     }
 
     @Override
-    protected void processFurther() throws GenerationException {
-        if (creator == null) {
-            throw new GenerationException("Transmission parameters didn't set");
-        }
-
-        CreationResult result;
+    public DataFrameBulk getNextBulk() throws GenerationException {
         try {
-            int read = preprocessor.getBytes(buffer);
-            result = creator.create(buffer, 0, read);
+            if (preprocessor.left() <= 0) {
+                return null;
+            }
         } catch (IOException e) {
             throw new GenerationException(e);
         }
 
-        previous = result.bulk;
-
         try {
-            preprocessor.returnBytes(result.unread);
+            preprocessor.readBytes(buffer, colorEncoder.estimateBufferSize() * framesPerBulk);
         } catch (IOException e) {
             throw new GenerationException(e);
         }
+
+        buffer.flip();
+        ColorDataFrame[] bulk = new ColorDataFrame[framesPerBulk];
+        for (int inBulk = 0; inBulk < framesPerBulk; inBulk++) {
+            bulk[inBulk] = colorEncoder.encode(buffer);
+        }
+        currentBulk++;
+        buffer.compact();
+        return new DataFrameBulk(bulk);
     }
 
     @Override
-    protected boolean hasMore() throws GenerationException {
-        try {
-            return preprocessor.left() > 0;
-        } catch (IOException e) {
-            throw new GenerationException(e);
-        }
+    public int getBulkIndex() {
+        return currentBulk;
     }
 
     @Override
@@ -110,8 +108,7 @@ public class FileDataFrameGenerator extends AbstractDataFrameGenerator {
                 "unitsPerFrame=" + unitsPerFrame +
                 ", framesPerBulk=" + framesPerBulk +
                 ", preprocessor=" + preprocessor +
-                ", creator=" + creator +
-                ", buffer=" + Arrays.toString(buffer) +
+                ", creator=" + colorEncoder +
                 '}';
     }
 

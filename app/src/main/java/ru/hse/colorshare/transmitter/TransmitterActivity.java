@@ -6,7 +6,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
-import android.database.Cursor;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -14,31 +13,26 @@ import android.graphics.PointF;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
-import android.provider.MediaStore;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
 
 import ru.hse.colorshare.MainActivity;
-import ru.hse.colorshare.generator.DataFrameGenerator;
-import ru.hse.colorshare.generator.FileDataFrameGenerator;
+import ru.hse.colorshare.generator.EncodingController;
+import ru.hse.colorshare.generator.SimpleEncodingController;
 import ru.hse.colorshare.generator.GenerationException;
 
 public class TransmitterActivity extends AppCompatActivity {
 
     private TransmissionState state;
     private TransmissionParams params;
-    private DataFrameGenerator generator;
+    private EncodingController generator;
 
     private int screenOrientation;
 
@@ -72,7 +66,7 @@ public class TransmitterActivity extends AppCompatActivity {
         }
 
         try {
-            generator = new FileDataFrameGenerator(fileToSendUri, this);
+            generator = new SimpleEncodingController(fileToSendUri, this);
         } catch (FileNotFoundException exc) {
             Log.d(LOG_TAG, exc.getMessage());
             setResult(MainActivity.TransmissionResultCode.FAILED_TO_READ_FILE.value, new Intent());
@@ -312,11 +306,6 @@ public class TransmitterActivity extends AppCompatActivity {
                     boolean response = waitForReceiverResponse();
                     Log.d(LOG_TAG, "data frame #" + generator.getBulkIndex() +
                             " was successfully sent = " + response);
-                    try {
-                        generator.setSuccess(response);
-                    } catch (GenerationException e) {
-                        e.printStackTrace();
-                    }
                 }
             }
 

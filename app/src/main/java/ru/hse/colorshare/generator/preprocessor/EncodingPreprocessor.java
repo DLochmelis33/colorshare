@@ -1,6 +1,7 @@
 package ru.hse.colorshare.generator.preprocessor;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /*
     Здесь возможна предобработка данных,
@@ -8,15 +9,9 @@ import java.io.IOException;
     как давать кодировщику в цвета - можно сжать данные или применить алгоритмы кодирования с восстановлением ошибок.
  */
 
-public interface RawDataPreprocessor {
+public interface EncodingPreprocessor {
 
-    default int getBytes(byte[] buffer) throws IOException {
-        return getBytes(buffer, 0, buffer.length);
-    }
-
-    int getBytes(byte[] buffer, int offset, int length) throws IOException;
-
-    void returnBytes(int count) throws IOException;
+    int readBytes(ByteBuffer buffer, int length) throws IOException;
 
     long left() throws IOException;
 }
