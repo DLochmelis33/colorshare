@@ -1,7 +1,12 @@
 package ru.hse.colorshare.coding.encoding;
 
-import java.io.Closeable;
+import android.content.Context;
+import android.net.Uri;
 
+import java.io.Closeable;
+import java.io.FileNotFoundException;
+
+import ru.hse.colorshare.coding.encoding.impl.SimpleEncodingController;
 import ru.hse.colorshare.coding.exceptions.EncodingException;
 import ru.hse.colorshare.transmitter.TransmissionParams;
 
@@ -10,6 +15,10 @@ import ru.hse.colorshare.transmitter.TransmissionParams;
  */
 
 public interface EncodingController extends Closeable {
+
+    static EncodingController create(Uri filename, Context context) throws FileNotFoundException {
+        return new SimpleEncodingController(filename, context);
+    }
 
     // Возвращается следующий балк дата фрэймов. null если данные кончились
     DataFrameBulk getNextBulk() throws EncodingException;

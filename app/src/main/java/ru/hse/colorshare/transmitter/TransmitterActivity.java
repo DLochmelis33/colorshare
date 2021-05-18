@@ -1,6 +1,5 @@
 package ru.hse.colorshare.transmitter;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.annotation.SuppressLint;
@@ -24,15 +23,16 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import ru.hse.colorshare.MainActivity;
-import ru.hse.colorshare.generator.DataFrameGenerator;
-import ru.hse.colorshare.generator.MockDataFrameGeneratorFactory;
+import ru.hse.colorshare.coding.encoding.DataFrameBulk;
+import ru.hse.colorshare.coding.encoding.EncodingController;
+import ru.hse.colorshare.coding.exceptions.EncodingException;
 
 @SuppressLint("Assert")
 public class TransmitterActivity extends AppCompatActivity {
 
     private TransmissionState state;
     private TransmissionParams params;
-    private MockDataFrameGeneratorFactory generatorFactory;
+    private EncodingController controller;
 
     private int screenOrientation;
 
@@ -52,7 +52,7 @@ public class TransmitterActivity extends AppCompatActivity {
         }
 
         try {
-            controller = new SimpleEncodingController(fileToSendUri, this);
+            controller = EncodingController.create(fileToSendUri, this);
         } catch (FileNotFoundException exc) {
             setResult(MainActivity.TransmissionResultCode.FAILED_TO_READ_FILE.value, new Intent());
             finish();
@@ -117,7 +117,7 @@ public class TransmitterActivity extends AppCompatActivity {
         public void surfaceCreated(SurfaceHolder holder) {
             Log.d(LOG_TAG, "DrawView created, transmission state = " + state);
             setRequestedOrientation(screenOrientation);
-            assert !state.equals(TransmissionState.CREATING) && generatorFactory != null;
+            assert !state.equals(TransmissionState.CREATING) && controller != null;
 
             // cancel because of params loss
             // TODO: support restoring = save TransmitterActivity fields via ViewModel
@@ -138,7 +138,7 @@ public class TransmitterActivity extends AppCompatActivity {
                 finish();
                 return;
             }
-            generatorFactory.setParams(params);
+            controller.setTransmissionParameters(params);
             assert params != null;
             Log.d(LOG_TAG, "Transmissions params: " + params.toString());
 
@@ -237,10 +237,15 @@ public class TransmitterActivity extends AppCompatActivity {
                 Canvas canvas;
                 while (true) {
                     canvas = null;
-                    DataFrameGenerator generator = generatorFactory.getDataFrameGenerator();
-                    Log.d(LOG_TAG, "Generator info: " + generator.getInfo());
+                    DataFrameBulk bulk;
                     try {
-                        List<Integer> colors = generator.getNextDataFrame();
+                        bulk  = controller.getNextBulk();
+                    } catch (EncodingException e) {
+                        throw new RuntimeException("Controller failed");
+                    }
+                    Log.d(LOG_TAG, "Generator info: " + controller.getInfo());
+                    try {
+                        int[] colors = bulk.getNextDataFrame();
                         if (colors == null) {
                             state = TransmissionState.FINISHED;
                             Log.d(LOG_TAG, "Transmission successfully finished!");
@@ -295,9 +300,11 @@ public class TransmitterActivity extends AppCompatActivity {
                             break;
                         }
                     }
+                    /*
                     Log.d(LOG_TAG, "data frame #" + generator.getFrameIndex() +
                             " was successfully sent = " + response);
                     generator.setSuccess(response);
+                     */
                 }
             }
 
