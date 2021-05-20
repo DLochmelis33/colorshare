@@ -9,6 +9,7 @@ import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
+import android.util.Log;
 
 import java.util.Arrays;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -77,7 +78,6 @@ public class ImageProcessor {
         }
     }
 
-    // ! this is quite dangerous since I don't know what exactly is happening inside the executor
     private static class DumpableLinkedBlockingQueue<E> extends LinkedBlockingQueue<E> {
 
         /**
@@ -112,12 +112,12 @@ public class ImageProcessor {
 
     public static void process(Task t) {
         // ! sometimes gets stuck, why though?
-//        Runtime runtime = Runtime.getRuntime();
-//        long availHeapSize = runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory());
-//        if (availHeapSize <= 16 * 1024 * 1024) { // on my phone one image is around 4MB
-//            Log.w(TAG, "dumping tasks");
-//            getInstance().tasksQueue.dump(10);
-//        }
+        Runtime runtime = Runtime.getRuntime();
+        long availHeapSize = runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory());
+        if (availHeapSize <= 16 * 1024 * 1024) { // on my phone one image is around 4MB
+            Log.w(TAG, "dumping tasks");
+            getInstance().tasksQueue.dump(10);
+        }
 
         getInstance().executor.execute(t);
     }
