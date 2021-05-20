@@ -34,10 +34,13 @@ public class ImageProcessor {
 
     public static class Task implements Runnable {
 
+        private static final long TIMEOUT = 1000;
+
         private final Handler resultHandler;
         private byte[] imageBytes;
         private final int width, height;
         private final RelativePoint[] hints;
+        private long startTime;
 
         public Task(byte[] imageBytes, int width, int height, RelativePoint[] hints, Handler resultHandler) {
             this.imageBytes = imageBytes;
@@ -47,20 +50,33 @@ public class ImageProcessor {
             this.hints = hints;
         }
 
+        // call after any long operation
+        private boolean isOutdated() {
+            return System.currentTimeMillis() - startTime > TIMEOUT;
+        }
+
         @Override
         public void run() {
-            long time = System.currentTimeMillis();
+            startTime = System.currentTimeMillis();
             if (!ImageProcessor.getInstance().isInit) {
                 ImageProcessor.getInstance().init(width, height, imageBytes.length);
             }
             if (ImageProcessor.getInstance().length != imageBytes.length || ImageProcessor.getInstance().width != width || ImageProcessor.getInstance().height != height) {
                 throw new IllegalStateException("ImageProcessor parameters cannot change");
             }
+
             Bitmap bitmap = ImageProcessor.getInstance().yuv420ToBitmap(imageBytes);
+            if(isOutdated()) {
+                return;
+            }
+
             imageBytes = null; // help GC!
-//            System.gc(); // ! this might slow everything down
+            System.gc(); // ! this might slow everything down
 
             ColorExtractor.LocatorResult[] locators = ColorExtractor.findLocators(bitmap, hints);
+            if(isOutdated()) {
+                return;
+            }
 //            ArrayList<Integer> colors = ColorExtractor.extractColors(bitmap, hints);
 
 
@@ -68,40 +84,26 @@ public class ImageProcessor {
             Message msg = Message.obtain(resultHandler, 0, Arrays.toString(locators));
             // String.format("#%06X", (0xFFFFFF & bitmap.getPixel(0, 0)))
             msg.sendToTarget();
-            Log.d(TAG, "ms=" + (System.currentTimeMillis() - time));
+//            Log.d(TAG, "ms=" + (System.currentTimeMillis() - startTime));
         }
     }
 
     // ! this is quite dangerous since I don't know what exactly is happening inside the executor
     private static class DumpableLinkedBlockingQueue<E> extends LinkedBlockingQueue<E> {
-        ReentrantLock lock = new ReentrantLock();
-
-        @Override
-        public void put(E e) throws InterruptedException {
-            lock.lock();
-            super.put(e);
-            lock.unlock();
-        }
-
-        @Override
-        public E take() throws InterruptedException {
-            lock.lock();
-            E result = super.take();
-            lock.unlock();
-            return result;
-        }
 
         /**
          * Removes oldest elements, blocking put() and take()
          *
-         * @param howMany
+         * @param howMany how many elements to remove
          */
         public void dump(int howMany) {
-            lock.lock();
             for (int i = 0; i < howMany; i++) {
-                super.poll();
+                try {
+                    super.take();
+                } catch (InterruptedException e) {
+                    // ignored
+                }
             }
-            lock.unlock();
         }
     }
 
@@ -120,12 +122,13 @@ public class ImageProcessor {
     }
 
     public static void process(Task t) {
-        Runtime runtime = Runtime.getRuntime();
-        long availHeapSize = runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory());
-        if (availHeapSize <= 16 * 1024 * 1024) { // on my phone one image is around 4MB
-            Log.w(TAG, "dumping tasks");
-            getInstance().tasksQueue.dump(10);
-        }
+        // ! sometimes gets stuck, why though?
+//        Runtime runtime = Runtime.getRuntime();
+//        long availHeapSize = runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory());
+//        if (availHeapSize <= 16 * 1024 * 1024) { // on my phone one image is around 4MB
+//            Log.w(TAG, "dumping tasks");
+//            getInstance().tasksQueue.dump(10);
+//        }
 
         getInstance().executor.execute(t);
     }

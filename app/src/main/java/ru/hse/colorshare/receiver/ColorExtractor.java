@@ -122,15 +122,6 @@ public class ColorExtractor {
                     }
                 }
             }
-//            for (int x = Math.max(0, pcx - PREV_CENTER_CHECKING_EPS); x < Math.min(img.getWidth(), pcx + PREV_CENTER_CHECKING_EPS); x += xSkip) {
-//                for (int y = Math.max(0, pcy - PREV_CENTER_CHECKING_EPS); y < Math.min(img.getHeight(), pcy + PREV_CENTER_CHECKING_EPS); y += ySkip) {
-//                    for (int unit = Math.max(1, prevCenterUnit - PREV_CENTER_UNIT_EPS); unit < prevCenterUnit + PREV_CENTER_UNIT_EPS; unit++) {
-//                        if (checkCenter(img, x, y, unit)) {
-//                            return specifyCenter(img, x, y, unit);
-//                        }
-//                    }
-//                }
-//            }
         }
         return findLocator(img, hint, hintPos);
     }
@@ -147,7 +138,7 @@ public class ColorExtractor {
         if (maxUnit > 100) {
             maxUnit = 100;
         }
-        Log.d(TAG, "minUnit=" + minUnit + ", maxUnit=" + maxUnit);
+//        Log.d(TAG, "minUnit=" + minUnit + ", maxUnit=" + maxUnit);
         for (int unit = minUnit; unit < maxUnit; unit += UNIT_SKIP) {
             int tcx = hint.x; // theoreticalCenterX
             int tcy = hint.y; // theoreticalCenterY
@@ -179,6 +170,13 @@ public class ColorExtractor {
                 }
             }
         }
+
+        for(int unit = 10; unit < 30; unit++) {
+            if (checkCenter(img, hint.x, hint.y, unit)) {
+                return specifyCenter(img, hint.x, hint.y, unit);
+            }
+        }
+
 //        Log.i(TAG, "no locator was found");
         return null;
     }
@@ -285,7 +283,9 @@ public class ColorExtractor {
 
     }
 
-    private static LocatorResult[] lastResult;
+    // found out that threads actually interfere with each other and break sometimes
+
+    private volatile static LocatorResult[] lastResult; // different threads make this 'null' when unnecessary
 
     @Nullable
     public static LocatorResult[] findLocators(Bitmap img, RelativePoint[] hints) {
@@ -390,13 +390,7 @@ public class ColorExtractor {
         return Color.rgb(sumR / total, sumG / total, sumB / total);
     }
 
-    private static Point deduceWidthAndHeight(Bitmap img, LocatorResult[] locators, Point gridCornerUL, Point gridCornerUR, Point gridCornerDR, Point gridCornerDL) {
-        double avgUnit = 0;
-        for (int i = 0; i < 4; i++) {
-            avgUnit += locators[i].unit;
-        }
-        avgUnit /= 4;
-
+    private static Point deduceWidthAndHeight(LocatorResult[] locators, Point gridCornerUL, Point gridCornerUR, Point gridCornerDR, Point gridCornerDL) {
         // check if unit sizes are similar enough: grid width and height should be unequivocal
         int gridHeightL1 = (int) Math.round(1.0 * (gridCornerDL.y - gridCornerUL.y) / locators[0].unit);
         int gridHeightL2 = (int) Math.round(1.0 * (gridCornerDL.y - gridCornerUL.y) / locators[3].unit);
@@ -450,7 +444,7 @@ public class ColorExtractor {
         Point gridCornerDL = new Point(locators[3].x - 2 * locators[3].unit, locators[3].y + 2 * locators[3].unit);
 
         if (gridWidth < 0 || gridHeight < 0) {
-            Point wh = deduceWidthAndHeight(img, locators, gridCornerUL, gridCornerUR, gridCornerDR, gridCornerDL);
+            Point wh = deduceWidthAndHeight(locators, gridCornerUL, gridCornerUR, gridCornerDR, gridCornerDL);
             if (wh == null) {
                 return null;
             }

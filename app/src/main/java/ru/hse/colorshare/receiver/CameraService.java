@@ -47,6 +47,10 @@ public class CameraService {
     private final TextureView previewView;
     private ImageReader imageReader;
 
+    private long lastFrameTime = 0;
+    private long frameTimeSum = 0;
+    private int frameCount = 0;
+
     public CameraService(CameraManager manager, ReceiverCameraActivity startingActivity, TextureView previewView) {
         this.manager = manager;
         this.cameraDevice = null;
@@ -235,6 +239,17 @@ public class CameraService {
                         image.close(); // ASAP
 
                         ImageProcessor.process(new ImageProcessor.Task(nv21, width, height, startingActivity.getHints(), startingActivity.getReceivingStatusHandler()));
+
+                        if(lastFrameTime == 0) {
+                            lastFrameTime = System.currentTimeMillis();
+                            return;
+                        }
+                        long newFrameTime = System.currentTimeMillis();
+                        long delta = newFrameTime - lastFrameTime;
+                        frameTimeSum += delta;
+                        frameCount++;
+                        Log.d("FPS", String.valueOf(1.0 * frameTimeSum / frameCount));
+                        lastFrameTime = newFrameTime;
                     }
 
                     @Override
