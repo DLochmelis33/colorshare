@@ -171,7 +171,7 @@ public class ColorExtractor {
             }
         }
 
-        for(int unit = 10; unit < 30; unit++) {
+        for (int unit = 10; unit < 30; unit++) {
             if (checkCenter(img, hint.x, hint.y, unit)) {
                 return specifyCenter(img, hint.x, hint.y, unit);
             }

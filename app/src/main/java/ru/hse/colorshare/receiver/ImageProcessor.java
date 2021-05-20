@@ -55,7 +55,7 @@ public class ImageProcessor {
             }
 
             Bitmap bitmap = ImageProcessor.getInstance().yuv420ToBitmap(imageBytes);
-            if(isOutdated()) {
+            if (isOutdated()) {
                 return;
             }
 
@@ -63,7 +63,7 @@ public class ImageProcessor {
             System.gc(); // ! this might slow everything down
 
             ColorExtractor.LocatorResult[] locators = ColorExtractor.findLocators(bitmap, hints);
-            if(isOutdated()) {
+            if (isOutdated()) {
                 return;
             }
 //            ArrayList<Integer> colors = ColorExtractor.extractColors(bitmap, hints);

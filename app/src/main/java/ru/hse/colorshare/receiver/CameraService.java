@@ -2,7 +2,6 @@ package ru.hse.colorshare.receiver;
 
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
@@ -240,7 +239,7 @@ public class CameraService {
 
                         ImageProcessor.process(new ImageProcessor.Task(nv21, width, height, startingActivity.getHints(), startingActivity.getReceivingStatusHandler()));
 
-                        if(lastFrameTime == 0) {
+                        if (lastFrameTime == 0) {
                             lastFrameTime = System.currentTimeMillis();
                             return;
                         }

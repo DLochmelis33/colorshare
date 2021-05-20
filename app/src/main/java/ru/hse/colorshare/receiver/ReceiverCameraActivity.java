@@ -54,6 +54,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == cameraPermissionRequestCode) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 init(null);
@@ -85,7 +86,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             public void handleMessage(Message msg) {
                 String s = String.valueOf(msg.obj);
                 dummyTextView.setText(s);
-                if(!s.equals("null")) {
+                if (!s.equals("null")) {
                     Log.d(TAG, s);
                 }
                 // drawing in this thread is too slow
