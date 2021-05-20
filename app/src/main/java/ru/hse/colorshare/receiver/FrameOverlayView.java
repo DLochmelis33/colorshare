@@ -54,13 +54,13 @@ public class FrameOverlayView extends View {
             double resultH = effectiveH;
             double marginX = margin;
             double marginY = margin;
-            if (effectiveH / effectiveW > ImageProcessor.RATIO) {
+            if (effectiveH / effectiveW > ImageProcessor.DEFAULT_RATIO) {
                 // h is less than max
-                resultH = effectiveW * ImageProcessor.RATIO;
+                resultH = effectiveW * ImageProcessor.DEFAULT_RATIO;
                 marginY = (h - resultH) / 2;
             } else {
                 // h is more than max
-                resultW = effectiveH / ImageProcessor.RATIO;
+                resultW = effectiveH / ImageProcessor.DEFAULT_RATIO;
                 marginX = (w - resultW) / 2;
             }
 

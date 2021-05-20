@@ -15,7 +15,6 @@ import ru.hse.colorshare.R;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int cameraPermissionRequestCode = 55555; // !
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -23,31 +22,10 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         Button receiveButton = findViewById(R.id.receive_button);
-        receiveButton.setOnClickListener(v -> tryStartReceiveActivity());
-    }
-
-    private void tryStartReceiveActivity() {
-        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.CAMERA}, cameraPermissionRequestCode);
-        } else {
-            startReceiveActivity();
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if(requestCode == cameraPermissionRequestCode) {
-            if(grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startReceiveActivity();
-            } else {
-                Toast.makeText(this, "Camera permission is required, please grant it.", Toast.LENGTH_LONG).show();
-            }
-        }
-    }
-
-    private void startReceiveActivity() {
-        Intent openReceiverActivityIntent = new Intent(MainActivity.this, ReceiverCameraActivity.class);
-        startActivity(openReceiverActivityIntent);
+        receiveButton.setOnClickListener(v -> {
+            Intent openReceiverActivityIntent = new Intent(MainActivity.this, ReceiverCameraActivity.class);
+            startActivity(openReceiverActivityIntent);
+        });
     }
 
 }

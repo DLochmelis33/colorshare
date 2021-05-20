@@ -227,13 +227,13 @@ public class CameraService {
                         ByteBuffer vuBuffer = image.getPlanes()[2].getBuffer();
                         int width = image.getWidth();
                         int height = image.getHeight();
-//                        Log.d(TAG, "imgw=" + width + " imgh=" + height);
                         int ySize = yBuffer.remaining();
                         int vuSize = vuBuffer.remaining();
                         byte[] nv21 = new byte[ySize + vuSize]; // ! ?
                         yBuffer.get(nv21, 0, ySize);
                         vuBuffer.get(nv21, ySize, vuSize);
                         image.close(); // ASAP
+
                         ImageProcessor.process(new ImageProcessor.Task(nv21, width, height, startingActivity.getHints(), startingActivity.getReceivingStatusHandler()));
                     }
 

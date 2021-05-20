@@ -15,6 +15,7 @@ import android.util.Log;
 import android.util.Size;
 import android.view.TextureView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -39,9 +40,31 @@ public class ReceiverCameraActivity extends AppCompatActivity {
 
     private Handler receivingStatusHandler;
 
+    private static final int cameraPermissionRequestCode = 55555; // !
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.CAMERA}, cameraPermissionRequestCode);
+        } else {
+            init(savedInstanceState);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == cameraPermissionRequestCode) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                init(null);
+            } else {
+                Toast.makeText(this, "Camera permission is required, please grant it.", Toast.LENGTH_LONG).show();
+                this.finish();
+            }
+        }
+    }
+
+    private void init(Bundle savedInstanceState) {
         setContentView(R.layout.activity_reciever_camera);
 
         // android-style assert
@@ -60,7 +83,11 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         receivingStatusHandler = new Handler(Looper.myLooper()) {
             @Override
             public void handleMessage(Message msg) {
-                dummyTextView.setText(String.valueOf(msg.obj));
+                String s = String.valueOf(msg.obj);
+                dummyTextView.setText(s);
+                if(!s.equals("null")) {
+                    Log.d(TAG, s);
+                }
                 // drawing in this thread is too slow
             }
         };
