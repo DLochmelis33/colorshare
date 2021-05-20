@@ -29,7 +29,9 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 import ru.hse.colorshare.BuildConfig;
 
@@ -50,6 +52,7 @@ public class CameraService {
     private long lastFrameTime = 0;
     private long frameTimeSum = 0;
     private int frameCount = 0;
+    private Queue<Long> timesQueue = new LinkedList<>();
 
     public CameraService(CameraManager manager, ReceiverCameraActivity startingActivity, TextureView previewView) {
         this.manager = manager;
@@ -246,10 +249,22 @@ public class CameraService {
                         }
                         long newFrameTime = System.currentTimeMillis();
                         long delta = newFrameTime - lastFrameTime;
+                        lastFrameTime = newFrameTime;
                         frameTimeSum += delta;
                         frameCount++;
-                        Log.d("FPS", String.valueOf(1.0 * frameTimeSum / frameCount));
-                        lastFrameTime = newFrameTime;
+                        timesQueue.add(delta);
+                        if(frameCount < 100) {
+                            return;
+                        }
+                        if(timesQueue.peek() == null) {
+                            timesQueue.clear();
+                            frameCount = 0;
+                            frameTimeSum = 0;
+                            return;
+                        }
+                        frameTimeSum -= timesQueue.poll();
+                        frameCount--;
+//                        Log.d("FPS", String.valueOf(1.0 * frameTimeSum / frameCount));
                     }
 
                     @Override
