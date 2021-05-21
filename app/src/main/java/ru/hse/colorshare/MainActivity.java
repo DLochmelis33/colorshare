@@ -19,6 +19,11 @@ import android.view.Menu;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.quietmodem.Quiet.FrameTransmitter;
+import org.quietmodem.Quiet.FrameTransmitterConfig;
+import org.quietmodem.Quiet.ModemException;
+
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,6 +33,8 @@ public class MainActivity extends AppCompatActivity {
 
     private TextView fileToSendTextView;
     private final FileToSendInfo fileToSendInfo = new FileToSendInfo();
+
+    private FrameTransmitter transmitter;
 
     private static final String LOG_TAG = "ColorShare:main";
 
@@ -41,6 +48,17 @@ public class MainActivity extends AppCompatActivity {
 
         fileToSendTextView = findViewById(R.id.fileToSendTextView);
         fileToSendInfo.name = getResources().getString(R.string.default_file_to_send_message);
+
+        FrameTransmitterConfig transmitterConfig;
+        try {
+            transmitterConfig = new FrameTransmitterConfig(
+                    this,"audible-7k-channel-0");
+            transmitter = new FrameTransmitter(transmitterConfig);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (ModemException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public void onClickSelectFile(View view) {
@@ -56,6 +74,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onClickStartSending(View view) {
+
+        String payload = "Hello, world!";
+        try {
+            transmitter.send(payload.getBytes());
+        } catch (IOException e) {
+            // our message might be too long or the transmit queue full
+        }
+
         if (fileToSendInfo.uri == null) {
             Toast.makeText(getApplicationContext(), "Select a file", Toast.LENGTH_SHORT).show();
             return;
@@ -63,6 +89,8 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(this, TransmitterActivity.class);
         intent.putExtra("fileToSendUri", fileToSendInfo.uri);
         startActivityForResult(intent, RequestCode.TRANSMIT_FILE.ordinal());
+
+
     }
 
     public void onClickTest(View view) {
