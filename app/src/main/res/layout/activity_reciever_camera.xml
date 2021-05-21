@@ -7,52 +7,50 @@
     android:layout_height="match_parent"
     tools:context=".receiver.ReceiverCameraActivity">
 
-    <LinearLayout
-        android:id="@+id/linearLayout"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:id="@+id/statusCoordinatorLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/cameraFrameLayout">
 
-        <FrameLayout
+        <com.google.android.material.bottomappbar.BottomAppBar
+            android:id="@+id/readingStatusBar"
+            style="@style/Widget.MaterialComponents.BottomAppBar.Colored"
             android:layout_width="match_parent"
-            android:layout_height="675dp">
-
-            <ru.hse.colorshare.receiver.CameraOverlaidView
-                android:id="@+id/cameraTextureView"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:clickable="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:keepScreenOn="true" />
-
-            <ru.hse.colorshare.receiver.FrameOverlayView
-                android:id="@+id/frameOverlayView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-
-        </FrameLayout>
-
-        <androidx.coordinatorlayout.widget.CoordinatorLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
-
-            <com.google.android.material.bottomappbar.BottomAppBar
-                android:id="@+id/readingStatusBar"
-                style="@style/Widget.MaterialComponents.BottomAppBar.Colored"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_gravity="bottom" />
+            android:layout_height="match_parent"
+            android:layout_gravity="bottom">
 
             <TextView
                 android:id="@+id/dummyReadingStatusTextView"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent" />
+                android:layout_height="match_parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent"/>
 
-        </androidx.coordinatorlayout.widget.CoordinatorLayout>
+        </com.google.android.material.bottomappbar.BottomAppBar>
 
-    </LinearLayout>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <FrameLayout
+        android:id="@+id/cameraFrameLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ru.hse.colorshare.receiver.CameraOverlaidView
+            android:id="@+id/cameraTextureView"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:keepScreenOn="true" />
+
+        <ru.hse.colorshare.receiver.FrameOverlayView
+            android:id="@+id/frameOverlayView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+    </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
