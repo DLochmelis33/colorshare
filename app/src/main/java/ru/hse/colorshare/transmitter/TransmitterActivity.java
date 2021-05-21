@@ -36,7 +36,7 @@ public class TransmitterActivity extends AppCompatActivity {
 
     private int screenOrientation;
 
-    private static int FRAMES_PER_BULK = 10; // constant for mock testing
+    private static final int FRAMES_PER_BULK = 10; // constant for mock testing
     private static final String LOG_TAG = "ColorShare:transmitter";
 
     @Override

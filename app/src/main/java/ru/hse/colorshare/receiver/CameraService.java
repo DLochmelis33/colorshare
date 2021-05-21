@@ -274,9 +274,9 @@ public class CameraService {
         int h = previewView.getHeight();
         double scaleByWidth = (double) w / size.getWidth();
         double scaleByHeight = (double) h / size.getHeight();
-        if (scaleByWidth * size.getHeight() < h) {
+        if (scaleByWidth * size.getHeight() <= h) {
             previewView.setLayoutParams(new FrameLayout.LayoutParams((int) (size.getWidth() * scaleByWidth), (int) (size.getHeight() * scaleByWidth)));
-        } else if (scaleByHeight * size.getWidth() < w) {
+        } else if (scaleByHeight * size.getWidth() <= w) {
             previewView.setLayoutParams(new FrameLayout.LayoutParams((int) (size.getWidth() * scaleByHeight), (int) (size.getHeight() * scaleByHeight)));
         } else {
             throw new AssertionError("unscalable size?");
