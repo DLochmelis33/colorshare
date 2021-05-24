@@ -18,6 +18,10 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 
+import org.quietmodem.Quiet.FrameTransmitter;
+import org.quietmodem.Quiet.FrameTransmitterConfig;
+import org.quietmodem.Quiet.ModemException;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +42,8 @@ public class TransmitterActivity extends AppCompatActivity {
 
     private static final int FRAMES_PER_BULK = 10; // constant for mock testing
     private static final String LOG_TAG = "ColorShare:transmitter";
+
+    private FrameTransmitter soundFrameTransmitter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,6 +76,15 @@ public class TransmitterActivity extends AppCompatActivity {
                     }
                 });
 
+        FrameTransmitterConfig transmitterConfig;
+        try {
+            transmitterConfig = new FrameTransmitterConfig(
+                    this, "audible-7k-channel-0");
+            soundFrameTransmitter = new FrameTransmitter(transmitterConfig);
+        } catch (IOException | ModemException e) {
+            throw new RuntimeException(e);
+        }
+
         enterFullscreenAndLockOrientation();
         setContentView(new DrawView(this));
     }
@@ -90,6 +105,9 @@ public class TransmitterActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         try {
+            if(soundFrameTransmitter != null) {
+                soundFrameTransmitter.close();
+            }
             if (encodingController != null) {
                 encodingController.close();
             }
@@ -126,6 +144,13 @@ public class TransmitterActivity extends AppCompatActivity {
                 setResult(MainActivity.TransmissionResultCode.CANCELED.value, new Intent());
                 finish();
                 return;
+            }
+
+            String helloMessage = "Hello from transmitter!";
+            try {
+                soundFrameTransmitter.send(helloMessage.getBytes());
+            } catch (IOException e) {
+                // our message might be too long or the transmit queue full
             }
 
             assert params == null && drawThread == null;
@@ -250,6 +275,12 @@ public class TransmitterActivity extends AppCompatActivity {
                         setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
                         finish();
                         return;
+                    }
+                    String message = "Bulk to send index #" + encodingController.getBulkIndex();
+                    try {
+                        soundFrameTransmitter.send(message.getBytes());
+                    } catch (IOException e) {
+                        // our message might be too long or the transmit queue full
                     }
                     Log.d(LOG_TAG, "Bulk # " + encodingController.getBulkIndex() + " is ready to be sent");
                     Log.d(LOG_TAG, "Encoding controller info: " + encodingController.getInfo());

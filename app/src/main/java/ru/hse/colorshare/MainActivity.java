@@ -69,8 +69,8 @@ public class MainActivity extends AppCompatActivity {
 
     public void onClickReceive(View view) {
         Log.d(LOG_TAG, "Start ReceiverCameraActivity");
-        Intent intent = new Intent(this, ReceiverCameraActivity.class);
-        startActivityForResult(intent, RequestCode.RECEIVE_FILE.ordinal());
+        Intent intent = new Intent(this, ru.hse.colorshare.MockReceiverActivity.class);
+        startActivity(intent);
     }
 
     @Override
