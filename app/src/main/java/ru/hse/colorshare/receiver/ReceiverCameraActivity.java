@@ -3,6 +3,7 @@ package ru.hse.colorshare.receiver;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
@@ -21,6 +22,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.util.Arrays;
 import java.util.Comparator;
 
 import ru.hse.colorshare.BuildConfig;
@@ -98,16 +100,14 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         receivingStatusHandler = new Handler(Looper.myLooper()) {
             @Override
             public void handleMessage(Message msg) {
-                String s = String.valueOf(msg.obj);
-                dummyTextView.setText(s);
-                if (!s.equals("null")) {
-                    Log.d(TAG, s);
-                }
+//                ColorExtractor.LocatorResult[] res = (ColorExtractor.LocatorResult[]) msg.obj;
+//                String s = Arrays.toString(res);
+//                dummyTextView.setText(s);
+
+                frameOverlayView.setExtras((Bitmap) msg.obj);
                 // drawing in this thread is too slow
             }
         };
-
-        ImageProcessor.getInstance().setContext(getApplicationContext());
 
         String cameraId = chooseCamera();
         if (cameraId == null) {

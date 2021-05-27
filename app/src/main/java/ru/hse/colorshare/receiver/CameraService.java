@@ -2,8 +2,11 @@ package ru.hse.colorshare.receiver;
 
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
+import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -24,6 +27,9 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -94,38 +100,38 @@ public class CameraService {
         return result;
     }
 
-    /* modified googlearchive way to choose size
-     *
-     * ---------------- DO NOT TOUCH ----------------
-     */
-    private Size chooseOptimalSizeMod(Size[] choices, int textureViewWidth,
-                                      int textureViewHeight, Size aspectRatio) {
-        Size result;
-
-        // Collect the supported resolutions that are at least as big as the preview Surface
-        List<Size> bigEnough = new ArrayList<>();
-        // Collect the supported resolutions that are smaller than the preview Surface
-        List<Size> notBigEnough = new ArrayList<>();
-        int w = aspectRatio.getWidth();
-        int h = aspectRatio.getHeight();
-        for (Size option : choices) {
-            if (option.getHeight() * w == option.getWidth() * h) {
-                if (option.getWidth() >= textureViewWidth && option.getHeight() >= textureViewHeight) {
-                    bigEnough.add(option);
-                } else {
-                    notBigEnough.add(option);
-                }
-            }
-        }
-        if (bigEnough.size() > 0) {
-            result = Collections.min(bigEnough, (s1, s2) -> s1.getWidth() * s1.getHeight() - s2.getWidth() * s2.getHeight());
-        } else if (notBigEnough.size() > 0) {
-            result = Collections.max(notBigEnough, (s1, s2) -> s1.getWidth() * s1.getHeight() - s2.getWidth() * s2.getHeight());
-        } else {
-            throw new IllegalStateException("couldn't find any suitable preview size");
-        }
-        return result;
-    }
+//    /* modified googlearchive way to choose size
+//     *
+//     * ---------------- DO NOT TOUCH ----------------
+//     */
+//    private Size chooseOptimalSizeMod(Size[] choices, int textureViewWidth,
+//                                      int textureViewHeight, Size aspectRatio) {
+//        Size result;
+//
+//        // Collect the supported resolutions that are at least as big as the preview Surface
+//        List<Size> bigEnough = new ArrayList<>();
+//        // Collect the supported resolutions that are smaller than the preview Surface
+//        List<Size> notBigEnough = new ArrayList<>();
+//        int w = aspectRatio.getWidth();
+//        int h = aspectRatio.getHeight();
+//        for (Size option : choices) {
+//            if (option.getHeight() * w == option.getWidth() * h) {
+//                if (option.getWidth() >= textureViewWidth && option.getHeight() >= textureViewHeight) {
+//                    bigEnough.add(option);
+//                } else {
+//                    notBigEnough.add(option);
+//                }
+//            }
+//        }
+//        if (bigEnough.size() > 0) {
+//            result = Collections.min(bigEnough, (s1, s2) -> s1.getWidth() * s1.getHeight() - s2.getWidth() * s2.getHeight());
+//        } else if (notBigEnough.size() > 0) {
+//            result = Collections.max(notBigEnough, (s1, s2) -> s1.getWidth() * s1.getHeight() - s2.getWidth() * s2.getHeight());
+//        } else {
+//            throw new IllegalStateException("couldn't find any suitable preview size");
+//        }
+//        return result;
+//    }
 
     private final CameraDevice.StateCallback cameraStateCallback = new CameraDevice.StateCallback() {
         @Override
@@ -142,29 +148,34 @@ public class CameraService {
                 }
 
                 // choose size of output surface
-                Size preferredSize = chooseOptimalSizeMod(configurations.getOutputSizes(SurfaceTexture.class),
-                        previewView.getWidth(), previewView.getHeight(),
-                        calculateMaxThroughputSize(configurations));
-//                Size preferredSize = calculateMaxThroughputSize(configurations); // ! DO NOT
+//                Size preferredSize = chooseOptimalSizeMod(configurations.getOutputSizes(SurfaceTexture.class),
+//                        previewView.getWidth(), previewView.getHeight(),
+//                        calculateMaxThroughputSize(configurations));
+                Size preferredSize = calculateMaxThroughputSize(configurations); // ! pls don't
 //                preferredSize = new Size(1280, 720); // magic numbers
 
+                Log.w(TAG, "PRE chosen size = " + preferredSize);
+
                 int sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-                Log.d(TAG, "sensor orientation = " + sensorOrientation);
+                Log.w(TAG, "sensor orientation = " + sensorOrientation);
                 if (sensorOrientation == 90 || sensorOrientation == 270) {
                     // swap dimensions
+                    Log.w(TAG, "rotated");
                     preferredSize = new Size(preferredSize.getHeight(), preferredSize.getWidth());
                 }
-                Log.d(TAG, "chosen size = " + preferredSize);
-                resizePreviewViewToRatio(preferredSize);
-
+                Log.w(TAG, "chosen size = " + preferredSize);
+                // ! before rotation ?
                 imageReader = ImageReader.newInstance(preferredSize.getWidth(), preferredSize.getHeight(), IMAGE_FORMAT, 2); // 2 is minimum required for acquireLatestImage
+                resizePreviewViewToRatio(preferredSize);
 
                 // create CaptureRequest
                 captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD); // record vs preview?
 //                captureRequestBuilder.set(CaptureRequest.JPEG_QUALITY, (byte) 97); // !
 //                captureRequestBuilder.set(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_OFF); // disable some post-processing related to edges of objects
                 captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
-                captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_STATE_ACTIVE_SCAN); // might be better than AF_MODE_CONTINUOUS_PICTURE
+                captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE); // ! maybe AF_STATE_ACTIVE_SCAN ?
+
+                captureRequestBuilder.set(CaptureRequest.JPEG_ORIENTATION, 90);
 
                 Surface previewSurface = new Surface(previewView.getSurfaceTexture());
                 previewView.getSurfaceTexture().setDefaultBufferSize(preferredSize.getWidth(), preferredSize.getHeight());
@@ -213,6 +224,12 @@ public class CameraService {
                             return;
                         }
 
+                        Runtime runtime = Runtime.getRuntime();
+                        long availHeapSize = runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory());
+                        if (availHeapSize <= 16 * 1024 * 1024) { // on my phone one image is around 4MB
+                            return;
+                        }
+
                         Image image = imageReader.acquireLatestImage();
                         if (image == null) {
 //                            Log.v(TAG, "null image");
@@ -235,12 +252,15 @@ public class CameraService {
                         int height = image.getHeight();
                         int ySize = yBuffer.remaining();
                         int vuSize = vuBuffer.remaining();
+
                         byte[] nv21 = new byte[ySize + vuSize]; // ! ?
                         yBuffer.get(nv21, 0, ySize);
                         vuBuffer.get(nv21, ySize, vuSize);
                         image.close(); // ASAP
 
-                        ImageProcessor.process(new ImageProcessor.Task(nv21, width, height, startingActivity.getHints(), startingActivity.getReceivingStatusHandler()));
+                        Log.d(TAG, "image width = " + width + ", height = " + height);
+                        ImageProcessor.process(new ImageProcessor.Task(nv21, width, height, startingActivity.getHints(),
+                                startingActivity.getReceivingStatusHandler(), startingActivity.getApplicationContext()));
 
                         if (lastFrameTime == 0) {
                             lastFrameTime = System.currentTimeMillis();
@@ -252,18 +272,20 @@ public class CameraService {
                         frameTimeSum += delta;
                         frameCount++;
                         timesQueue.add(delta);
-                        if(frameCount < 100) {
+                        if (frameCount < 100) {
                             return;
                         }
-                        if(timesQueue.peek() == null) {
+                        if (timesQueue.peek() == null) {
                             timesQueue.clear();
                             frameCount = 0;
                             frameTimeSum = 0;
                             return;
                         }
-                        frameTimeSum -= timesQueue.poll();
+                        frameTimeSum -= timesQueue.poll(); // no NPE, see previous 'if'
                         frameCount--;
-//                        Log.d("FPS", String.valueOf(1.0 * frameTimeSum / frameCount));
+                        Log.v("FPS", String.valueOf(1.0 * frameTimeSum / frameCount));
+
+
                     }
 
                     @Override
@@ -284,9 +306,11 @@ public class CameraService {
         }
     };
 
+
     public void resizePreviewViewToRatio(Size size) {
         int w = previewView.getWidth();
         int h = previewView.getHeight();
+        Log.w(TAG, "resizing: w was " + w + ", h was " + h);
         double scaleByWidth = (double) w / size.getWidth();
         double scaleByHeight = (double) h / size.getHeight();
         if (scaleByWidth * size.getHeight() <= h) {
@@ -296,6 +320,7 @@ public class CameraService {
         } else {
             throw new AssertionError("unscalable size?");
         }
+        Log.w(TAG, "resizing: w new " + previewView.getWidth() + ", h new " + previewView.getHeight());
     }
 
     public void closeCamera() {

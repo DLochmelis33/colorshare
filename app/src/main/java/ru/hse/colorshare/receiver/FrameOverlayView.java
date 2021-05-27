@@ -43,8 +43,8 @@ public class FrameOverlayView extends View {
     private class OverlayFrame extends Drawable {
 
         private Matrix ul, ur, dr, dl;
-        double[] xHints = new double[4];
-        double[] yHints = new double[4];
+        volatile double[] xHints = new double[4];
+        volatile double[] yHints = new double[4];
 
         public void resizeToView(int w, int h) {
             Log.d("frameOverlay", "resizing to w=" + w + " h=" + h);
@@ -151,16 +151,25 @@ public class FrameOverlayView extends View {
     public void draw(Canvas canvas) {
         super.draw(canvas);
         frame.draw(canvas);
+
+        if (extras != null) {
+            canvas.drawBitmap(extras, extrasMtx, paint);
+        }
     }
+
+    private Bitmap extras;
+    private Matrix extrasMtx;
 
     @Override
     public void setLayoutParams(ViewGroup.LayoutParams params) {
-        frame.resizeToView(params.width, params.height);
         super.setLayoutParams(params);
+        frame.resizeToView(params.width, params.height);
+        requestLayout();
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
         frame.resizeToView(w, h);
     }
 
@@ -174,6 +183,17 @@ public class FrameOverlayView extends View {
             result[i] = new RelativePoint(frame.xHints[i], frame.yHints[i]);
         }
         return result;
+    }
+
+    public void setExtras(Bitmap bitmap) {
+        extras = bitmap;
+        float scaleWidth = (float) underlyingView.getWidth() / bitmap.getWidth();
+        float scaleHeight = (float) underlyingView.getHeight() / bitmap.getHeight();
+        extrasMtx = new Matrix();
+        extrasMtx.postScale(scaleWidth, scaleHeight);
+//        Log.d("xtr", "undW=" + underlyingView.getWidth() + " undH=" + underlyingView.getHeight() +
+//                " bitW=" + bitmap.getWidth() + " bitH=" + bitmap.getHeight());
+        invalidate();
     }
 }
 

@@ -25,10 +25,12 @@ public class CameraOverlaidView extends TextureView {
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
         if (overlayView != null) {
             Log.d("CameraOverlaidView", "w=" + w + " h=" + h + " oldw=" + oldw + " oldh=" + oldh);
             overlayView.setLayoutParams(new FrameLayout.LayoutParams(w, h));
         }
+        requestLayout();
     }
 
     @SuppressLint("ClickableViewAccessibility")
