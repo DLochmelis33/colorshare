@@ -8,21 +8,18 @@ import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.util.Size;
 import android.view.TextureView;
-import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import java.util.Arrays;
 import java.util.Comparator;
 
 import ru.hse.colorshare.BuildConfig;
@@ -46,12 +43,12 @@ public class ReceiverCameraActivity extends AppCompatActivity {
     private static final int cameraPermissionRequestCode = 55555; // !
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    protected void onStart() {
+        super.onStart();
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, cameraPermissionRequestCode);
         } else {
-            init(savedInstanceState);
+            init();
         }
     }
 
@@ -60,7 +57,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == cameraPermissionRequestCode) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                init(null);
+                init();
             } else {
                 Toast.makeText(this, "Camera permission is required, please grant it.", Toast.LENGTH_LONG).show();
                 this.finish();
@@ -68,12 +65,12 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         }
     }
 
-    private void init(Bundle savedInstanceState) {
+    private void init() {
         setContentView(R.layout.activity_reciever_camera);
 
         // android-style assert
         if (BuildConfig.DEBUG && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            throw new AssertionError("expected camera permission");
+            throw new IllegalStateException("expected camera permission");
         }
 
         CameraOverlaidView cameraTextureView = findViewById(R.id.cameraTextureView);
@@ -84,18 +81,8 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
         cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView);
 
-        View statusBar = findViewById(R.id.readingStatusBar);
-        View statusLayout = findViewById(R.id.statusCoordinatorLayout);
-        
-        // didn't help:
-//        statusLayout.forceLayout();
-//        statusBar.forceLayout();
-//        dummyTextView.forceLayout();
-
-//        findViewById(R.id.ConstraintLayout).invalidate();
-//        statusLayout.invalidate();
-//        statusBar.invalidate();
-//        dummyTextView.invalidate();
+//        BottomAppBar statusBar = findViewById(R.id.readingStatusBar);
+//        TextView statusLayout = findViewById(R.id.statusCoordinatorLayout);
 
         receivingStatusHandler = new Handler(Looper.myLooper()) {
             @Override
@@ -105,7 +92,6 @@ public class ReceiverCameraActivity extends AppCompatActivity {
 //                dummyTextView.setText(s);
 
                 frameOverlayView.setExtras((Bitmap) msg.obj);
-                // drawing in this thread is too slow
             }
         };
 
@@ -139,20 +125,10 @@ public class ReceiverCameraActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
+    protected void onStop() {
+        super.onStop();
         cameraService.closeCamera();
-//        ImageProcessor.getInstance().EXECUTOR.shutdownNow();
+        ImageProcessor.getInstance().shutdown();
     }
 
     public RelativePoint[] getHints() {
