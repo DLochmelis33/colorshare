@@ -2,6 +2,7 @@ package ru.hse.colorshare.communication;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -21,9 +22,9 @@ public class SoundCommunicator implements Communicator {
     final FrameTransmitter transmitter;
     final FrameReceiver receiver;
 
-    final long blockingTimeoutInSeconds;
+    private static final String LOG_TAG = "ColorShare:communicator";
 
-    protected SoundCommunicator(@NonNull Context context, @NonNull String transmitterProfileKey, @NonNull String receiverProfileKey, long blockingTimeoutInSeconds) {
+    protected SoundCommunicator(@NonNull Context context, @NonNull String transmitterProfileKey, @NonNull String receiverProfileKey) {
         try {
             transmitterConfig = new FrameTransmitterConfig(context, transmitterProfileKey);
             receiverConfig = new FrameReceiverConfig(context, receiverProfileKey);
@@ -36,29 +37,38 @@ public class SoundCommunicator implements Communicator {
         } catch (ModemException modemException) {
             throw new RuntimeException("Failed to create SoundCommunicator while setting up transmitter and receiver", modemException);
         }
-        this.blockingTimeoutInSeconds = blockingTimeoutInSeconds;
-
+        Log.d(LOG_TAG, "SoundCommunicator constructed");
         // TODO: ask for permissions to record sound and check sound is on => TransmitterActivity
     }
 
     @SuppressLint("Assert")
     @Override
-    public void blockingSend(@NonNull byte[] toSendMessage) throws IOException {
-        if (toSendMessage.length > transmitter.getFrameLength()) {
-            throw new IllegalArgumentException("To-send message is to long: " + toSendMessage.length + " > frame length " + transmitter.getFrameLength());
-        }
-        transmitter.setBlocking(blockingTimeoutInSeconds, 0); // maybe it's enough to be done only once in c-tor
+    public void blockingSend(@NonNull byte[] toSendMessage, long blockingTimeoutInSeconds) throws IOException {
+        assert toSendMessage.length <= transmitter.getFrameLength();
+        transmitter.setBlocking(blockingTimeoutInSeconds, 0);
         long sentBytesNumber = transmitter.send(toSendMessage);
         assert sentBytesNumber == toSendMessage.length;
+        Log.d(LOG_TAG, sentBytesNumber + " message bytes were successfully sent");
     }
 
     @SuppressLint("Assert")
     @Override
-    public void blockingReceive(@NonNull byte[] receivedMessageBuffer) throws IOException {
-        if (receivedMessageBuffer.length < transmitter.getFrameLength()) {
-            throw new IllegalArgumentException("Message buffer is to short: " + receivedMessageBuffer.length + " < frame length " + transmitter.getFrameLength());
-        }
+    public long blockingReceive(@NonNull byte[] receivedMessageBuffer, long blockingTimeoutInSeconds) throws IOException {
+        assert receivedMessageBuffer.length >= transmitter.getFrameLength();
+        receiver.setBlocking(blockingTimeoutInSeconds, 0);
         long receivedBytesNumber = receiver.receive(receivedMessageBuffer);
-        assert receivedBytesNumber <= transmitter.getFrameLength();
+        Log.d(LOG_TAG, receivedBytesNumber + " message bytes were successfully received");
+        return receivedBytesNumber;
+    }
+
+    @Override
+    public void close() {
+        if (transmitter != null) {
+            transmitter.close();
+        }
+        if (receiver != null) {
+            receiver.close();
+        }
+        Log.d(LOG_TAG, "SoundCommunicator was successfully closed");
     }
 }

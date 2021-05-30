@@ -25,11 +25,13 @@ import org.quietmodem.Quiet.ModemException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import ru.hse.colorshare.MainActivity;
 import ru.hse.colorshare.coding.encoding.DataFrameBulk;
 import ru.hse.colorshare.coding.encoding.EncodingController;
 import ru.hse.colorshare.coding.exceptions.EncodingException;
+import ru.hse.colorshare.communication.Communicator;
 
 @SuppressLint("Assert")
 public class TransmitterActivity extends AppCompatActivity {
@@ -43,7 +45,7 @@ public class TransmitterActivity extends AppCompatActivity {
     private static final int FRAMES_PER_BULK = 10; // constant for mock testing
     private static final String LOG_TAG = "ColorShare:transmitter";
 
-    private FrameTransmitter soundFrameTransmitter;
+    private Communicator communicator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,12 +53,6 @@ public class TransmitterActivity extends AppCompatActivity {
 
         Uri fileToSendUri = getIntent().getParcelableExtra("fileToSendUri");
         Log.d(LOG_TAG, "received intent: " + "uri = " + fileToSendUri);
-
-        try {
-            Log.d(LOG_TAG, Integer.toString(getContentResolver().openInputStream(fileToSendUri).read()));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
         try {
             encodingController = EncodingController.create(fileToSendUri, this);
@@ -76,14 +72,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     }
                 });
 
-        FrameTransmitterConfig transmitterConfig;
-        try {
-            transmitterConfig = new FrameTransmitterConfig(
-                    this, "audible-7k-channel-0");
-            soundFrameTransmitter = new FrameTransmitter(transmitterConfig);
-        } catch (IOException | ModemException e) {
-            throw new RuntimeException(e);
-        }
+        communicator = Communicator.getColorShareTransmitterSideCommunicator(this);
 
         enterFullscreenAndLockOrientation();
         setContentView(new DrawView(this));
@@ -105,20 +94,23 @@ public class TransmitterActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         try {
-            if(soundFrameTransmitter != null) {
-                soundFrameTransmitter.close();
+            if (communicator != null) {
+                communicator.close();
             }
             if (encodingController != null) {
                 encodingController.close();
             }
-        } catch (IOException exc) {
-            throw new RuntimeException("Transmission file failed to close", exc);
+        } catch (IOException ioException) {
+            throw new RuntimeException("Transmission file failed to close", ioException);
         }
     }
 
     private class DrawView extends SurfaceView implements SurfaceHolder.Callback {
 
         private DrawThread drawThread;
+        private TransmissionControllerThread controllerThread;
+        private final AtomicBoolean running = new AtomicBoolean(true);
+
         private int sentFrames = 0; // need only for mock testing
 
         public DrawView(Context context) {
@@ -146,13 +138,6 @@ public class TransmitterActivity extends AppCompatActivity {
                 return;
             }
 
-            String helloMessage = "Hello from transmitter!";
-            try {
-                soundFrameTransmitter.send(helloMessage.getBytes());
-            } catch (IOException e) {
-                // our message might be too long or the transmit queue full
-            }
-
             assert params == null && drawThread == null;
             try {
                 params = evaluateTransmissionParams();
@@ -170,18 +155,21 @@ public class TransmitterActivity extends AppCompatActivity {
 
             // start transmission
             drawThread = new DrawThread(getHolder());
+            controllerThread = new TransmissionControllerThread();
             state = TransmissionState.STARTED;
             drawThread.start();
+            controllerThread.start();
         }
 
         @Override
         public void surfaceDestroyed(SurfaceHolder holder) {
             boolean retry = true;
             if (state.equals(TransmissionState.STARTED) || state.equals(TransmissionState.FINISHED)) {
-                assert drawThread != null;
-                drawThread.setRunningFalse();
+                assert drawThread != null && controllerThread != null;
+                running.set(false);
                 while (retry) {
                     try {
+                        controllerThread.join();
                         drawThread.join();
                         retry = false;
                     } catch (InterruptedException ignored) {
@@ -241,9 +229,12 @@ public class TransmitterActivity extends AppCompatActivity {
             return unitSize >= 40; // mock for now
         }
 
+        private class TransmissionControllerThread extends Thread {
+
+        }
+
         private class DrawThread extends Thread {
 
-            private boolean running = true;
             private final SurfaceHolder surfaceHolder;
 
             private final Paint paint;
@@ -251,11 +242,6 @@ public class TransmitterActivity extends AppCompatActivity {
             public DrawThread(SurfaceHolder surfaceHolder) {
                 this.surfaceHolder = surfaceHolder;
                 paint = new Paint();
-            }
-
-            public synchronized void setRunningFalse() {
-                running = false;
-                notify();
             }
 
             @Override
@@ -278,7 +264,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     }
                     String message = "Bulk to send index #" + encodingController.getBulkIndex();
                     try {
-                        soundFrameTransmitter.send(message.getBytes());
+                        communicator.blockingSend(message.getBytes(), 5);
                     } catch (IOException e) {
                         // our message might be too long or the transmit queue full
                     }
@@ -327,11 +313,11 @@ public class TransmitterActivity extends AppCompatActivity {
                         }
                         boolean response;
                         synchronized (this) {
-                            if (!running) {
+                            if (!running.get()) {
                                 return;
                             }
                             response = waitForReceiverResponse();
-                            if (!running) {
+                            if (!running.get()) {
                                 return;
                             }
                             if (response) {
@@ -384,9 +370,9 @@ public class TransmitterActivity extends AppCompatActivity {
 
     private enum TransmissionState {
         CREATING, // generatorFactory == null
-        INITIAL, // generatorFactory != null, params == null, drawThread == null
-        STARTED, // generatorFactory != null, params != null, drawThread != null
-        FINISHED, // happy path transmission is finished: still generatorFactory != null, params != null, drawThread != null
-        FAILED // after: now transmission can fail only at evaluating params => generatorFactory != null, params == null, drawThread == null
+        INITIAL, // generatorFactory != null, params == null, drawThread == null, controllerThread == null
+        STARTED, // generatorFactory != null, params != null, drawThread != null, controllerThread != null
+        FINISHED, // happy path transmission is finished: still generatorFactory != null, params != null, drawThread != null, controllerThread != null
+        FAILED // after: now transmission can fail only at evaluating params => generatorFactory != null, params == null, drawThread == null, , controllerThread == null
     }
 }
