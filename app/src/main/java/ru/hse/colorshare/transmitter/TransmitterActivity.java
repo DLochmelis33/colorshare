@@ -213,7 +213,7 @@ public class TransmitterActivity extends AppCompatActivity {
 
         private boolean testReceiverAbilityToRead(int unitSize) {
             // TODO: add test messaging with receiver
-            return unitSize >= 40; // mock for now
+            return unitSize >= 47; // mock for now
         }
 
         private class DrawThread extends Thread {
@@ -271,9 +271,9 @@ public class TransmitterActivity extends AppCompatActivity {
                             LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_TOP, unitSize);
                             canvas.save();
                             canvas.translate(locatorMarkSize * unitSize, 0);
-                            int stripeWidth = params.cols - 2 * locatorMarkSize; // in units
-                            int index = drawColorUnitsStripe(canvas, colors, 0, locatorMarkSize, stripeWidth);
-                            canvas.translate(stripeWidth * unitSize, 0);
+                            final int stripeBetweenMarksWidth = params.cols - 2 * locatorMarkSize; // in units
+                            int index = drawColorUnitsStripe(canvas, colors, 0, locatorMarkSize, stripeBetweenMarksWidth);
+                            canvas.translate(stripeBetweenMarksWidth * unitSize, 0);
                             LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.RIGHT_TOP, unitSize);
                             canvas.restore();
 
@@ -286,7 +286,10 @@ public class TransmitterActivity extends AppCompatActivity {
                             canvas.translate(0, stripeHeight * unitSize);
                             LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_BOTTOM, unitSize);
                             canvas.translate(locatorMarkSize * unitSize, 0);
-                            drawColorUnitsStripe(canvas, colors, index, locatorMarkSize, params.cols - locatorMarkSize);
+                            index = drawColorUnitsStripe(canvas, colors, index, locatorMarkSize, stripeBetweenMarksWidth);
+                            canvas.translate(stripeBetweenMarksWidth * unitSize, 0);
+                            LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.RIGHT_BOTTOM, unitSize);
+                            assert index == colors.length;
 
                             canvas.restore();
                         } finally {

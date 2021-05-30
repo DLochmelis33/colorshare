@@ -22,15 +22,13 @@ public final class TransmissionParams {
         this.cols = cols;
         this.leftTopOfGrid = leftTopOfGrid;
         unitRect = new Rect(0, 0, unitSize, unitSize);
-        getColorFrameSize();
-    }
-
-    public int getColorFrameSize() throws IllegalStateException { // in color units
-        int frameSize = rows * cols - 3 * LocatorMarkGraphic.SIZE_IN_UNITS;
-        if (frameSize <= 0) {
+        if (getColorFrameSize() <= 0) {
             throw new IllegalStateException("number of color units in frame <= 0");
         }
-        return frameSize;
+    }
+
+    public int getColorFrameSize() { // in color units
+        return rows * cols - 4 * LocatorMarkGraphic.SIZE_IN_UNITS;
     }
 
     @Override
