@@ -84,19 +84,6 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
         cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView);
 
-        View statusBar = findViewById(R.id.readingStatusBar);
-        View statusLayout = findViewById(R.id.statusCoordinatorLayout);
-        
-        // didn't help:
-//        statusLayout.forceLayout();
-//        statusBar.forceLayout();
-//        dummyTextView.forceLayout();
-
-//        findViewById(R.id.ConstraintLayout).invalidate();
-//        statusLayout.invalidate();
-//        statusBar.invalidate();
-//        dummyTextView.invalidate();
-
         receivingStatusHandler = new Handler(Looper.myLooper()) {
             @Override
             public void handleMessage(Message msg) {
