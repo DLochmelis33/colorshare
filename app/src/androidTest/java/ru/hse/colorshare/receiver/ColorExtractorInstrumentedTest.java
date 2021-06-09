@@ -26,7 +26,7 @@ public class ColorExtractorInstrumentedTest {
 
     // ! check ColorExtractor constants before testing !
 
-    private Bitmap smallImage, normalImage, photoImage, photoCroppedImage, unitSmallerPhotoImage16x9, unitSmallerPhotoImage4x3;
+    private Bitmap smallImage, normalImage, photoImage, photoCroppedImage, unitSmallerPhotoImage16x9, unitSmallerPhotoImage4x3, colorfulImage;
 
     private static final String TAG = "testing";
 
@@ -50,6 +50,9 @@ public class ColorExtractorInstrumentedTest {
         unitSmallerPhotoImage4x3 = Bitmap.createScaledBitmap(
                 BitmapFactory.decodeResource(InstrumentationRegistry.getInstrumentation().getContext().getResources(), R.drawable.test_image_unit_smaller_4x3),
                 1274, 1699, false);
+        colorfulImage = Bitmap.createScaledBitmap(
+                BitmapFactory.decodeResource(InstrumentationRegistry.getInstrumentation().getContext().getResources(), R.drawable.test_image_colorful),
+                750, 1000, false);
     }
 
     @Test
@@ -222,6 +225,32 @@ public class ColorExtractorInstrumentedTest {
         Assert.assertNotNull(ul);
         Log.d(TAG, ul.toString());
         Assert.assertTrue(diffEps(ul.x, 627, 5) && diffEps(ul.y, 727, 5) && diffEps(ul.unit, 90, 5));
+    }
+
+    @Test
+    public void testColorful() {
+        RelativePoint[] hints = new RelativePoint[]{
+                new RelativePoint(0, 0),
+                new RelativePoint(1, 0),
+                new RelativePoint(1, 1),
+                new RelativePoint(0, 1)
+        };
+        ArrayList<Integer> colors = ColorExtractor.extractColors(colorfulImage, hints);
+        Assert.assertNotNull(colors);
+        Assert.assertEquals(15 * 20 - 36 * 4, colors.size());
+        for (int i = 0; i < colors.size(); i++) {
+            switch(i % 3) {
+                case 0:
+                    Assert.assertEquals(Color.RED, (int) colors.get(i));
+                    break;
+                case 1:
+                    Assert.assertEquals(Color.GREEN, (int) colors.get(i));
+                    break;
+                case 2:
+                    Assert.assertEquals(Color.BLUE, (int) colors.get(i));
+                    break;
+            }
+        }
     }
 
 }

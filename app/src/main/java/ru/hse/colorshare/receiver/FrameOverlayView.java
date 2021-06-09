@@ -193,8 +193,8 @@ public class FrameOverlayView extends View {
         float scaleHeight = (float) underlyingView.getHeight() / bitmap.getHeight();
         extrasMtx = new Matrix();
         extrasMtx.postScale(scaleWidth, scaleHeight);
-        Log.d("FrameOverlay", "undW=" + underlyingView.getWidth() + " undH=" + underlyingView.getHeight() +
-                " bitW=" + bitmap.getWidth() + " bitH=" + bitmap.getHeight());
+//        Log.d("FrameOverlay", "undW=" + underlyingView.getWidth() + " undH=" + underlyingView.getHeight() +
+//                " bitW=" + bitmap.getWidth() + " bitH=" + bitmap.getHeight());
         invalidate();
     }
 }

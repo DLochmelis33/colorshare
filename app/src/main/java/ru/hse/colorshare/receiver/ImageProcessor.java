@@ -12,7 +12,6 @@ import android.renderscript.RenderScript;
 import android.util.Log;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -91,7 +90,7 @@ public class ImageProcessor {
             if (isOutdated("locators found")) {
                 return;
             }
-            Log.d(TAG, Arrays.toString(locators));
+//            Log.d(TAG, Arrays.toString(locators));
 
             // ! ! !
             Bitmap extrasBitmap = Bitmap.createBitmap(height, width, Bitmap.Config.ARGB_8888);
@@ -107,7 +106,7 @@ public class ImageProcessor {
                 return;
             }
 
-            // ! debug
+            // ! debug broken :)
 //            Paint hp = new Paint();
 //            hp.setARGB(150, 240, 240, 30);
 //            for (RelativePoint rp : hints) {
@@ -116,27 +115,25 @@ public class ImageProcessor {
 
             ArrayList<Integer> colors = ColorExtractor.extractColorsFromResult(bitmap, locators, getInstance().gridWidth, getInstance().gridHeight);
             if (colors != null) {
-                boolean correct = true;
-                for (int i = 0; i < colors.size(); i++) {
-                    correct = ((i % 2 == 0) == ColorExtractor.BitmapBinaryWrapper.roundColorBW(colors.get(i)));
-                    if (!correct) {
-                        break;
-                    }
-                }
-
                 // ! debug
+//                boolean correct = true;
+//                for (int i = 0; i < colors.size(); i++) {
+//                    correct = ((i % 2 == 0) == ColorExtractor.BitmapBinaryWrapper.roundColorBW(colors.get(i)));
+//                    if (!correct) {
+//                        break;
+//                    }
+//                }
 //                Log.d(TAG, "success=" + correct);
 
                 if (isOutdated("colors checked")) {
                     return;
                 }
             } else {
-                Log.d(TAG, "no colors");
+                Log.w(TAG, "no colors");
             }
 
 //            // TODO
             Message msg = Message.obtain(resultHandler, 0, extrasBitmap);
-            // String.format("#%06X", (0xFFFFFF & bitmap.getPixel(0, 0)))
             msg.sendToTarget();
 
             long workTime = System.currentTimeMillis() - startTime;
@@ -151,7 +148,7 @@ public class ImageProcessor {
 
     private final int poolSize = Runtime.getRuntime().availableProcessors();
     private final BlockingQueue<Runnable> tasksQueue = new LinkedBlockingQueue<>();
-    public final ThreadPoolExecutor executor = new ThreadPoolExecutor(
+    public ThreadPoolExecutor executor = new ThreadPoolExecutor(
             poolSize, poolSize, Long.MAX_VALUE, TimeUnit.NANOSECONDS, tasksQueue, new ThreadPoolExecutor.AbortPolicy()
     );
     private static final ImageProcessor instance = new ImageProcessor();
@@ -207,6 +204,11 @@ public class ImageProcessor {
         }
         executor.shutdownNow();
         isInit.set(false);
+
+        // ! TODO: FIX THIS CODESTYLE (new executor alive after shutdown)
+        executor = new ThreadPoolExecutor(
+                poolSize, poolSize, Long.MAX_VALUE, TimeUnit.NANOSECONDS, tasksQueue, new ThreadPoolExecutor.AbortPolicy()
+        );
     }
 
     public Bitmap rotate(Bitmap bitmap) {

@@ -23,6 +23,10 @@ public class CameraOverlaidView extends TextureView {
         this.overlayView = overlayView;
     }
 
+    public FrameOverlayView getOverlayView() {
+        return overlayView;
+    }
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);

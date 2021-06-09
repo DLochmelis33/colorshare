@@ -24,6 +24,7 @@ import java.util.Comparator;
 
 import ru.hse.colorshare.BuildConfig;
 import ru.hse.colorshare.R;
+import ru.hse.colorshare.receiver.util.CameraException;
 import ru.hse.colorshare.receiver.util.RelativePoint;
 
 public class ReceiverCameraActivity extends AppCompatActivity {
@@ -38,6 +39,20 @@ public class ReceiverCameraActivity extends AppCompatActivity {
     }
 
     private Handler receivingStatusHandler;
+    private final Thread.UncaughtExceptionHandler exceptionHandler = new Thread.UncaughtExceptionHandler() {
+        @Override
+        public void uncaughtException(@NonNull Thread t, @NonNull Throwable e) {
+            // TODO: status
+            Log.e(TAG, e.getMessage());
+            String toastMessage = "Sorry, something went wrong.";
+            if (e instanceof CameraException) {
+                toastMessage = "Sorry, something went wrong with the camera.";
+            }
+            // ! for some reason doesn't show; probably bc of Context being destroyed with the activity?
+            Toast.makeText(ReceiverCameraActivity.this.getApplicationContext(), toastMessage, Toast.LENGTH_LONG).show();
+            ReceiverCameraActivity.this.finish();
+        }
+    };
 
     private static final int cameraPermissionRequestCode = 55555; // !
 
@@ -66,6 +81,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
 
     private void init() {
         setContentView(R.layout.activity_reciever_camera);
+        Thread.currentThread().setUncaughtExceptionHandler(exceptionHandler);
 
         // android-style assert
         if (BuildConfig.DEBUG && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -77,18 +93,14 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         cameraTextureView.setOverlayView(frameOverlayView);
         frameOverlayView.setUnderlyingView(cameraTextureView);
 
-        TextView dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
-        cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView);
+//        TextView dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
+        cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView, exceptionHandler);
 
         receivingStatusHandler = new Handler(Looper.myLooper()) {
             @Override
             public void handleMessage(Message msg) {
-//                ColorExtractor.LocatorResult[] res = (ColorExtractor.LocatorResult[]) msg.obj;
-//                String s = Arrays.toString(res);
-//                dummyTextView.setText(s);
-
+                // TODO: more info
                 frameOverlayView.setExtras((Bitmap) msg.obj);
-                // drawing in this thread is too slow
             }
         };
 
@@ -129,10 +141,6 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         super.onPause();
         cameraService.closeCamera();
         ImageProcessor.getInstance().shutdown();
-    }
-
-    public RelativePoint[] getHints() {
-        return frameOverlayView.getCornersHints();
     }
 
     // returns a camera that 1) faces backwards and is not monochrome 2) is of largest sensor area

@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import ru.hse.colorshare.BuildConfig;
+import ru.hse.colorshare.receiver.util.CameraException;
 import ru.hse.colorshare.receiver.util.SlidingAverage;
 
 public class CameraService {
@@ -44,22 +45,24 @@ public class CameraService {
     public static final int IMAGE_FORMAT = ImageFormat.JPEG;
 
     private final ReceiverCameraActivity startingActivity;
-    private final TextureView previewView;
+    private final CameraOverlaidView previewView;
     private ImageReader imageReader;
 
     private Handler backgroundHandler;
     private HandlerThread backgroundThread;
+    private final Thread.UncaughtExceptionHandler exceptionHandler;
 
     private long lastFrameTime = 0;
-    private final int fpsWindowSize = 100;
+    private final int fpsWindowSize = 50;
     private final SlidingAverage fpsCounter = new SlidingAverage(fpsWindowSize);
 
-    public CameraService(CameraManager manager, ReceiverCameraActivity startingActivity, TextureView previewView) {
+    public CameraService(CameraManager manager, ReceiverCameraActivity startingActivity, CameraOverlaidView previewView, Thread.UncaughtExceptionHandler exceptionHandler) {
         this.manager = manager;
         this.cameraDevice = null;
         cameraId = null;
         this.previewView = previewView;
         this.startingActivity = startingActivity;
+        this.exceptionHandler = exceptionHandler;
     }
 
     public void tryOpenCamera(String cameraId) {
@@ -72,8 +75,7 @@ public class CameraService {
             startBackgroundThread();
             manager.openCamera(cameraId, cameraStateCallback, null /* will modify UI in this thread */);
         } catch (CameraAccessException e) {
-            e.printStackTrace();
-            throw new RuntimeException("couldn't open camera " + cameraId);
+            throw new CameraException("couldn't open camera " + cameraId, e);
         }
     }
 
@@ -84,7 +86,7 @@ public class CameraService {
         assert sizes != null;
         Log.d(TAG, Arrays.toString(sizes));
         for (Size size : sizes) {
-            if (size.getWidth() > 2000) {
+            if (size.getWidth() > 1000) {
                 continue; // too large sizes decrease fps
             }
             double maxTheoreticalFps = 1e9 / config.getOutputMinFrameDuration(previewView.getSurfaceTexture().getClass(), size);
@@ -113,7 +115,7 @@ public class CameraService {
                     throw new IllegalStateException("camera cannot output to SurfaceTexture");
                 }
 
-                Log.w(TAG, "available sizes: " + Arrays.toString(configurations.getOutputSizes(SurfaceTexture.class)));
+                Log.d(TAG, "available sizes: " + Arrays.toString(configurations.getOutputSizes(SurfaceTexture.class)));
 
                 // choose size of output surface
                 Size preferredSize = calculateMaxThroughputSize(configurations);
@@ -126,7 +128,8 @@ public class CameraService {
 //                    // swap dimensions
 //                    preferredSize = new Size(preferredSize.getHeight(), preferredSize.getWidth());
 //                }
-//                Log.w(TAG, "chosen size = " + preferredSize);
+
+                Log.d(TAG, "chosen size = " + preferredSize);
 
                 resizePreviewViewToRatio(new Size(preferredSize.getHeight(), preferredSize.getWidth())); // ! ! !
                 previewView.forceLayout();
@@ -158,7 +161,7 @@ public class CameraService {
 
             } catch (CameraAccessException e) {
                 e.printStackTrace();
-                throw new RuntimeException("camera access exception");
+                throw new CameraException("camera access exception", e);
             }
         }
 
@@ -170,7 +173,7 @@ public class CameraService {
 
         @Override
         public void onError(@NonNull CameraDevice camera, int error) {
-            throw new RuntimeException("camera error, code " + error);
+            throw new CameraException("camera error, code " + error);
         }
     };
 
@@ -220,7 +223,7 @@ public class CameraService {
                         imgBuffer.get(imgBytes, 0, bytesSize);
                         image.close(); // ASAP
 
-                        ImageProcessor.process(new ImageProcessor.Task(imgBytes, width, height, startingActivity.getHints(),
+                        ImageProcessor.process(new ImageProcessor.Task(imgBytes, width, height, previewView.getOverlayView().getCornersHints(),
                                 startingActivity.getReceivingStatusHandler(), startingActivity.getApplicationContext()));
 
                         if (lastFrameTime == 0) {
@@ -242,14 +245,13 @@ public class CameraService {
                 }, backgroundHandler);
 
             } catch (CameraAccessException e) {
-                e.printStackTrace();
-                throw new RuntimeException();
+                throw new CameraException(e);
             }
         }
 
         @Override
         public void onConfigureFailed(CameraCaptureSession session) {
-            throw new IllegalStateException("camera configuring failed");
+            throw new CameraException("camera configuring failed");
         }
     };
 
@@ -288,6 +290,7 @@ public class CameraService {
 
     private void startBackgroundThread() {
         backgroundThread = new HandlerThread("CameraBackground");
+        backgroundThread.setUncaughtExceptionHandler(exceptionHandler);
         backgroundThread.start();
         backgroundHandler = new Handler(backgroundThread.getLooper());
     }
@@ -299,6 +302,7 @@ public class CameraService {
             backgroundThread = null;
             backgroundHandler = null;
         } catch (InterruptedException e) {
+            // ignore
             e.printStackTrace();
         }
     }
