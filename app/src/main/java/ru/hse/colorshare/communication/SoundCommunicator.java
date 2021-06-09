@@ -28,7 +28,6 @@ public class SoundCommunicator implements Communicator {
 
     @SuppressLint("Assert")
     protected SoundCommunicator(@NonNull Context context, @NonNull String transmitterProfileKey, @NonNull String receiverProfileKey) {
-        assert context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
         try {
             transmitterConfig = new FrameTransmitterConfig(context, transmitterProfileKey);
             receiverConfig = new FrameReceiverConfig(context, receiverProfileKey);
@@ -57,12 +56,12 @@ public class SoundCommunicator implements Communicator {
 
     @SuppressLint("Assert")
     @Override
-    public long blockingReceive(@NonNull byte[] receivedMessageBuffer, long blockingTimeoutInSeconds) throws IOException {
+    public int blockingReceive(@NonNull byte[] receivedMessageBuffer, long blockingTimeoutInSeconds) throws IOException {
         assert receivedMessageBuffer.length >= transmitter.getFrameLength();
         receiver.setBlocking(blockingTimeoutInSeconds, 0);
         long receivedBytesNumber = receiver.receive(receivedMessageBuffer);
         Log.d(LOG_TAG, receivedBytesNumber + " message bytes were successfully received");
-        return receivedBytesNumber;
+        return (int) receivedBytesNumber;
     }
 
     @Override

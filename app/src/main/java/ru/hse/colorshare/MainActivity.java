@@ -1,8 +1,10 @@
 package ru.hse.colorshare;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -22,7 +24,6 @@ import android.widget.Toast;
 import java.util.HashMap;
 import java.util.Map;
 
-import ru.hse.colorshare.receiver.ReceiverCameraActivity;
 import ru.hse.colorshare.transmitter.TransmitterActivity;
 
 public class MainActivity extends AppCompatActivity {
@@ -42,6 +43,27 @@ public class MainActivity extends AppCompatActivity {
 
         fileToSendTextView = findViewById(R.id.fileToSendTextView);
         fileToSendInfo.name = getResources().getString(R.string.default_file_to_send_message);
+
+        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, RequestCode.RECORD_AUDIO_PERMISSION.ordinal());
+    }
+
+    @SuppressWarnings("SwitchStatementWithTooFewBranches")
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        switch (RequestCode.values()[requestCode]) {
+            case RECORD_AUDIO_PERMISSION: {
+                if (!(grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+                    setResult(MainActivity.TransmissionResultCode.FAILED_TO_GET_RECORD_AUDIO_PERMISSION.value, new Intent());
+                    finish();
+                }
+                break;
+            }
+            default:
+                throw new IllegalStateException("illegal permission request code");
+        }
     }
 
     public void onClickSelectFile(View view) {
@@ -128,6 +150,12 @@ public class MainActivity extends AppCompatActivity {
                     case FAILED_TO_GET_TRANSMISSION_PARAMS:
                         Toast.makeText(getApplicationContext(), "File sending failed: bad device params", Toast.LENGTH_LONG).show();
                         break;
+                    case PAIRING_FAILED:
+                        Toast.makeText(getApplicationContext(), "File sending failed: transmitter and receiver pairing failed, try again", Toast.LENGTH_LONG).show();
+                        break;
+                    case FAILED_TO_SEND_BULK:
+                        Toast.makeText(getApplicationContext(), "File sending failed: too many attempts to send one bulk, try again", Toast.LENGTH_LONG).show();
+                        break;
                 }
                 break;
             case RECEIVE_FILE:
@@ -169,6 +197,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private enum RequestCode {
+        RECORD_AUDIO_PERMISSION,
         PICK_FILE,
         TRANSMIT_FILE,
         RECEIVE_FILE
@@ -179,7 +208,9 @@ public class MainActivity extends AppCompatActivity {
         CANCELED(Activity.RESULT_CANCELED),
         FAILED_TO_GET_RECORD_AUDIO_PERMISSION(4),
         FAILED_TO_READ_FILE(5),
-        FAILED_TO_GET_TRANSMISSION_PARAMS(6);
+        FAILED_TO_GET_TRANSMISSION_PARAMS(6),
+        PAIRING_FAILED(7),
+        FAILED_TO_SEND_BULK(8);
 
         public final int value;
         private static final Map<Integer, TransmissionResultCode> map = new HashMap<>();

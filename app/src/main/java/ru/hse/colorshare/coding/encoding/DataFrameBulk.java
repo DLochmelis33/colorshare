@@ -4,6 +4,10 @@ package ru.hse.colorshare.coding.encoding;
     Класс, описывающий массив дата фрэймов.
  */
 
+import androidx.annotation.NonNull;
+
+import java.util.Arrays;
+
 public class DataFrameBulk {
     private final ColorDataFrame[] bulk;
     private int current = 0;
@@ -12,8 +16,18 @@ public class DataFrameBulk {
         this.bulk = bulk;
     }
 
+    @SuppressWarnings("MethodDoesntCallSuperMethod")
+    @NonNull
+    public DataFrameBulk clone() {
+        return new DataFrameBulk(bulk.clone());
+    }
+
     public ColorDataFrame[] getDataFrames() {
         return bulk;
+    }
+
+    public int getBulkIndex() { // TODO: move bulk index here from controller
+        return 65;
     }
 
     public int[] getNextDataFrame() {

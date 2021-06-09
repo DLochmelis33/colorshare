@@ -2,8 +2,11 @@ package ru.hse.colorshare.communication;
 
 import android.annotation.SuppressLint;
 
+import androidx.annotation.NonNull;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import ru.hse.colorshare.coding.encoding.DataFrameBulk;
@@ -85,8 +88,8 @@ public class CommunicationProtocol {
             }
         }
 
-        public static TransmitterMessage createInProgressMessage(long uniqueTransmissionKey, int bulkIndex, DataFrameBulk bulk, TransmissionParams transmissionParams) {
-            return new TransmitterMessage(uniqueTransmissionKey, TransmissionState.IN_PROGRESS, bulkIndex, transmissionParams.rows, transmissionParams.cols, bulk.getChecksums());
+        public static TransmitterMessage createInProgressMessage(long uniqueTransmissionKey, int bulkIndex, long[] bulkChecksums, TransmissionParams transmissionParams) {
+            return new TransmitterMessage(uniqueTransmissionKey, TransmissionState.IN_PROGRESS, bulkIndex, transmissionParams.rows, transmissionParams.cols, bulkChecksums);
         }
 
         public static TransmitterMessage createSuccessfullyFinishedMessage(long uniqueTransmissionKey) {
@@ -116,6 +119,18 @@ public class CommunicationProtocol {
                 byteBuffer.putLong(checksum);
             }
             return byteBuffer.array();
+        }
+
+        @NonNull
+        @Override
+        public String toString() {
+            return "Transmitter message: " + "\n" +
+                    "uniqueTransmissionKey = " + uniqueTransmissionKey + "\n" +
+                    "transmissionState = " + transmissionState + "\n" +
+                    "bulkIndex = " + bulkIndex + "\n" +
+                    "gridRows = " + gridRows + "\n" +
+                    "gridCols = " + gridCols + "\n" +
+                    "checksums = " + Arrays.toString(checksums) + "\n";
         }
 
         private static boolean checkTransmitterMessageCanHaveSuchSizeInBytes(int size) {
@@ -167,6 +182,14 @@ public class CommunicationProtocol {
             byteBuffer.putLong(uniqueTransmissionKey);
             byteBuffer.putInt(bulkIndex);
             return byteBuffer.array();
+        }
+
+        @NonNull
+        @Override
+        public String toString() {
+            return "Receiver message: " + "\n" +
+                    "uniqueTransmissionKey = " + uniqueTransmissionKey + "\n" +
+                    "bulkIndex = " + bulkIndex + "\n";
         }
 
         public static int getSizeInBytes() {

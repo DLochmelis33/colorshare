@@ -1,6 +1,5 @@
 package ru.hse.colorshare.transmitter;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.Manifest;
@@ -23,13 +22,18 @@ import android.view.View;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import ru.hse.colorshare.MainActivity;
 import ru.hse.colorshare.coding.encoding.DataFrameBulk;
 import ru.hse.colorshare.coding.encoding.EncodingController;
 import ru.hse.colorshare.coding.exceptions.EncodingException;
+import ru.hse.colorshare.communication.CommunicationProtocol;
 import ru.hse.colorshare.communication.Communicator;
 
 @SuppressLint("Assert")
@@ -70,13 +74,10 @@ public class TransmitterActivity extends AppCompatActivity {
                         enterFullscreenAndLockOrientation();
                     }
                 });
+        enterFullscreenAndLockOrientation();
 
-        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},
-                RequestCode.PERMISSION_REQUEST_RECORD_AUDIO.ordinal());
         assert checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
         communicator = Communicator.getColorShareTransmitterSideCommunicator(this);
-
-        enterFullscreenAndLockOrientation();
         setContentView(new DrawView(this));
     }
 
@@ -90,22 +91,6 @@ public class TransmitterActivity extends AppCompatActivity {
                 | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_FULLSCREEN);
-    }
-
-    @SuppressWarnings("SwitchStatementWithTooFewBranches")
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        switch (RequestCode.values()[requestCode]) {
-            case PERMISSION_REQUEST_RECORD_AUDIO: {
-                if (!(grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                    setResult(MainActivity.TransmissionResultCode.FAILED_TO_GET_RECORD_AUDIO_PERMISSION.value, new Intent());
-                    finish();
-                }
-            }
-        }
     }
 
     @Override
@@ -127,11 +112,11 @@ public class TransmitterActivity extends AppCompatActivity {
 
         private DrawThread drawThread;
         private TransmissionControllerThread controllerThread;
-        private final AtomicBoolean running = new AtomicBoolean(true);
 
         private DataFrameBulk currentBulk;
-
-        private int sentFrames = 0; // need only for mock testing
+        private DrawThreadState drawThreadState;
+        private final Lock drawThreadStateLock = new ReentrantLock();
+        private final Condition drawThreadStateHasChanged = drawThreadStateLock.newCondition();
 
         public DrawView(Context context) {
             super(context);
@@ -177,6 +162,7 @@ public class TransmitterActivity extends AppCompatActivity {
             drawThread = new DrawThread(getHolder());
             controllerThread = new TransmissionControllerThread();
             state = TransmissionState.STARTED;
+            drawThreadState = DrawThreadState.WAIT_FOR_BULK;
             drawThread.start();
             controllerThread.start();
         }
@@ -186,8 +172,12 @@ public class TransmitterActivity extends AppCompatActivity {
             boolean retry = true;
             if (state.equals(TransmissionState.STARTED) || state.equals(TransmissionState.FINISHED)) {
                 assert drawThread != null && controllerThread != null;
-                synchronized (running) {
-                    running.set(false);
+                drawThreadStateLock.lock();
+                try {
+                    drawThreadState = DrawThreadState.FINISH;
+                    drawThread.interrupt();
+                } finally {
+                    drawThreadStateLock.unlock();
                 }
                 while (retry) {
                     try {
@@ -202,13 +192,125 @@ public class TransmitterActivity extends AppCompatActivity {
         }
 
         private class TransmissionControllerThread extends Thread {
-            public TransmissionControllerThread() {
-            }
 
             @Override
             public void run() {
+                byte[] buffer = new byte[1000];
+                final long uniqueTransmitterKey = new Random().nextLong();
+                Log.d(LOG_TAG, "Unique transmitter key generated = " + uniqueTransmitterKey);
+                long uniqueReceiverKey = runPairing(uniqueTransmitterKey, buffer);
+                if (uniqueReceiverKey == -1) {
+                    return;
+                }
 
+                while (true) {
+                    long[] bulkChecksums;
+                    int bulkIndex;
+                    drawThreadStateLock.lock();
+                    try {
+                        currentBulk = encodingController.getNextBulk();
+                        bulkChecksums = currentBulk.getChecksums().clone();
+                        bulkIndex = encodingController.getBulkIndex();
+                        if (currentBulk == null) {
+                            state = TransmissionState.FINISHED;
+                            try {
+                                final int blockingSendTimeout = 2;
+                                communicator.blockingSend(CommunicationProtocol.TransmitterMessage.createSuccessfullyFinishedMessage(uniqueTransmitterKey).toByteArray(), blockingSendTimeout);
+                            } catch (IOException ioException) {
+                                Log.d(LOG_TAG, "Blocking send of finish-message IOException: " + ioException.getMessage());
+                            }
+                            setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
+                            finish();
+                            return;
+                        }
+                        Log.d(LOG_TAG, "Set current bulk: index #" + bulkIndex);
+                        if (!drawThreadState.equals(DrawThreadState.DRAW_BULK)) {
+                            drawThreadState = DrawThreadState.DRAW_BULK;
+                            Log.d(LOG_TAG, "Changed draw thread state to DRAW_BULK");
+                            drawThreadStateHasChanged.signal();
+                        }
+                    } catch (EncodingException encodingException) {
+                        throw new RuntimeException("Encoding controller failed", encodingException);
+                    } finally {
+                        drawThreadStateLock.unlock();
+                    }
+
+                    if(!sendBulkInfoAndWaitForReceiverResponse(uniqueTransmitterKey, uniqueReceiverKey, bulkIndex, bulkChecksums, buffer)) {
+                        return;
+                    }
+                }
             }
+
+            private long runPairing(long uniqueTransmitterKey, byte[] buffer) {
+                final long fileToSendSize = 100;
+                final int maxPairingAttempts = 3;
+                CommunicationProtocol.HelloMessage helloMessageToSend = CommunicationProtocol.HelloMessage.create(uniqueTransmitterKey, fileToSendSize);
+                Log.d(LOG_TAG, "Start pairing");
+                for (int i = 0; i < maxPairingAttempts; i++) {
+                    Log.d(LOG_TAG, "Pairing attempt #" + i);
+                    try {
+                        final int blockingSendTimeout = 2;
+                        communicator.blockingSend(helloMessageToSend.toByteArray(), blockingSendTimeout);
+                    } catch (IOException ioException) {
+                        Log.d(LOG_TAG, "Blocking send of hello message IOException: " + ioException.getMessage());
+                        continue;
+                    }
+                    Log.d(LOG_TAG, "Hello message was successfully sent");
+                    final int blockingReceiveTimeout = 5;
+                    CommunicationProtocol.HelloMessage receivedHelloMessage;
+                    try {
+                        receivedHelloMessage = CommunicationProtocol.HelloMessage.parseFromByteArray(buffer, communicator.blockingReceive(buffer, blockingReceiveTimeout));
+                    } catch (IOException ioException) {
+                        Log.d(LOG_TAG, "Blocking receive of hello message IOException: " + ioException.getMessage());
+                        continue;
+                    }
+                    Log.d(LOG_TAG, "Hello message was successfully received");
+                    assert receivedHelloMessage != null;
+                    assert receivedHelloMessage.fileToSendSize == fileToSendSize;
+                    Log.d(LOG_TAG, "Pairing succeed! Unique receiver key = " + receivedHelloMessage.uniqueTransmissionKey);
+                    return receivedHelloMessage.uniqueTransmissionKey;
+                }
+                setResult(MainActivity.TransmissionResultCode.PAIRING_FAILED.value, new Intent());
+                finish();
+                return -1;
+            }
+
+            private boolean sendBulkInfoAndWaitForReceiverResponse(long uniqueTransmitterKey, long uniqueReceiverKey, int bulkIndex, long[] bulkChecksums, byte[] buffer) {
+                final int maxSendBulkInfoAttempts = 5;
+                final int blockingSendTimeout = 2;
+                final int blockingReceiveTimeout = 5;
+                CommunicationProtocol.TransmitterMessage bulkInfoMessage =
+                        CommunicationProtocol.TransmitterMessage.createInProgressMessage(
+                                uniqueTransmitterKey,
+                                bulkIndex,
+                                bulkChecksums,
+                                params);
+                Log.d(LOG_TAG, "Start sending bulk info message:\n" + bulkInfoMessage);
+                for (int i = 0; i < maxSendBulkInfoAttempts; i++) {
+                    try {
+                        communicator.blockingSend(bulkInfoMessage.toByteArray(), blockingSendTimeout);
+                    } catch (IOException ioException) {
+                        Log.d(LOG_TAG, "Blocking send of bulk info message IOException: " + ioException.getMessage());
+                        continue;
+                    }
+                    Log.d(LOG_TAG, "Bulk info message was successfully sent");
+                    try {
+                        CommunicationProtocol.ReceiverMessage receiverMessage = CommunicationProtocol.ReceiverMessage.parseFromByteArray(uniqueReceiverKey, buffer, communicator.blockingReceive(buffer, blockingReceiveTimeout));
+                        Log.d(LOG_TAG, "Received success-message from receiver: " + receiverMessage);
+                        if (receiverMessage == null) { // TODO:  skip messages with other key
+                            continue;
+                        }
+                        assert receiverMessage.bulkIndex == bulkIndex;
+                        return true;
+                    } catch (IOException ioException) {
+                        Log.d(LOG_TAG, "Blocking send of bulk info message IOException: " + ioException.getMessage());
+                    }
+                }
+                setResult(MainActivity.TransmissionResultCode.FAILED_TO_SEND_BULK.value, new Intent());
+                finish();
+                return false;
+            }
+
         }
 
         private class DrawThread extends Thread {
@@ -224,87 +326,79 @@ public class TransmitterActivity extends AppCompatActivity {
 
             @Override
             public void run() {
-                Canvas canvas;
-                while (true) {
-                    canvas = null;
+                while (true) { // change bulk cycle
                     DataFrameBulk bulk;
+                    drawThreadStateLock.lock();
                     try {
-                        bulk = encodingController.getNextBulk();
-                    } catch (EncodingException encodingException) {
-                        throw new RuntimeException("Encoding controller failed", encodingException);
-                    }
-                    if (bulk == null) {
-                        state = TransmissionState.FINISHED;
-                        Log.d(LOG_TAG, "Transmission successfully finished!");
-                        setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
-                        finish();
-                        return;
-                    }
-                    String message = "Bulk to send index #" + encodingController.getBulkIndex();
-                    try {
-                        communicator.blockingSend(message.getBytes(), 5);
-                    } catch (IOException e) {
-                        // our message might be too long or the transmit queue full
-                    }
-                    Log.d(LOG_TAG, "Bulk # " + encodingController.getBulkIndex() + " is ready to be sent");
-                    Log.d(LOG_TAG, "Encoding controller info: " + encodingController.getInfo());
-                    while (true) { // bulk cycle // TODO: add timeout?
                         try {
-                            int[] colors = bulk.getNextDataFrame();
-
-                            canvas = surfaceHolder.lockCanvas(null);
-                            if (canvas == null)
-                                continue;
-                            canvas.drawColor(Color.BLACK);
-                            canvas.translate(params.leftTopOfGrid.x, params.leftTopOfGrid.y);
-                            canvas.save();
-
-                            int locatorMarkSize = LocatorMarkGraphic.SIDE_SIZE_IN_UNITS;
-                            int unitSize = params.unitSize;
-
-                            // top stripe
-                            LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_TOP, unitSize);
-                            canvas.save();
-                            canvas.translate(locatorMarkSize * unitSize, 0);
-                            int stripeWidth = params.cols - 2 * locatorMarkSize; // in units
-                            int index = drawColorUnitsStripe(canvas, colors, 0, locatorMarkSize, stripeWidth);
-                            canvas.translate(stripeWidth * unitSize, 0);
-                            LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.RIGHT_TOP, unitSize);
-                            canvas.restore();
-
-                            // mid stripe
-                            canvas.translate(0, locatorMarkSize * unitSize);
-                            int stripeHeight = params.rows - 2 * locatorMarkSize;
-                            index = drawColorUnitsStripe(canvas, colors, index, stripeHeight, params.cols);
-
-                            // bottom stripe
-                            canvas.translate(0, stripeHeight * unitSize);
-                            LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_BOTTOM, unitSize);
-                            canvas.translate(locatorMarkSize * unitSize, 0);
-                            drawColorUnitsStripe(canvas, colors, index, locatorMarkSize, params.cols - locatorMarkSize);
-
-                            canvas.restore();
-                        } finally {
-                            if (canvas != null) {
-                                surfaceHolder.unlockCanvasAndPost(canvas);
+                            while (drawThreadState.equals(DrawThreadState.WAIT_FOR_BULK)) {
+//                                setContentView(R.layout.setting_up_communication);
+                                drawThreadStateHasChanged.await();
+//                                setContentView(DrawView.this);
                             }
+                        } catch (InterruptedException ignored) {
                         }
-                        boolean response;
-                        synchronized (running) {
-                            if (!running.get()) {
-                                return;
-                            }
-                            response = waitForReceiverResponse();
-                            if (!running.get()) {
-                                return;
-                            }
-                            if (response) {
-                                Log.d(LOG_TAG, "Bulk #" + encodingController.getBulkIndex() +
-                                        " was successfully sent");
-                                break;
-                            }
+                        if (drawThreadState.equals(DrawThreadState.FINISH)) {
+                            return;
                         }
-                    } // bulk cycle
+                        bulk = currentBulk.clone();
+                    } finally {
+                        drawThreadStateLock.unlock();
+                    }
+                    long oneFrameDelayInNanos = params.getOneFrameDelayInNanos();
+                    Log.d(LOG_TAG, "Bulk # " + bulk.getBulkIndex() + " is ready to be sent");
+                    Log.d(LOG_TAG, "Encoding controller info: " + encodingController.getInfo());
+
+                    while (true) { // draw bulk cycle
+                        drawAndPostColorFrame(bulk.getNextDataFrame());
+                        try {
+                            TimeUnit.NANOSECONDS.sleep(oneFrameDelayInNanos);
+                        } catch (InterruptedException stopDrawingBulk) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            private void drawAndPostColorFrame(int[] colors) {
+                Canvas canvas = null;
+                try {
+                    canvas = surfaceHolder.lockCanvas(null);
+                    if (canvas == null)
+                        return;
+                    canvas.drawColor(Color.BLACK);
+                    canvas.translate(params.leftTopOfGrid.x, params.leftTopOfGrid.y);
+                    canvas.save();
+
+                    int locatorMarkSize = LocatorMarkGraphic.SIDE_SIZE_IN_UNITS;
+                    int unitSize = params.unitSize;
+
+                    // top stripe
+                    LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_TOP, unitSize);
+                    canvas.save();
+                    canvas.translate(locatorMarkSize * unitSize, 0);
+                    int stripeWidth = params.cols - 2 * locatorMarkSize; // in units
+                    int index = drawColorUnitsStripe(canvas, colors, 0, locatorMarkSize, stripeWidth);
+                    canvas.translate(stripeWidth * unitSize, 0);
+                    LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.RIGHT_TOP, unitSize);
+                    canvas.restore();
+
+                    // mid stripe
+                    canvas.translate(0, locatorMarkSize * unitSize);
+                    int stripeHeight = params.rows - 2 * locatorMarkSize;
+                    index = drawColorUnitsStripe(canvas, colors, index, stripeHeight, params.cols);
+
+                    // bottom stripe
+                    canvas.translate(0, stripeHeight * unitSize);
+                    LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_BOTTOM, unitSize);
+                    canvas.translate(locatorMarkSize * unitSize, 0);
+                    drawColorUnitsStripe(canvas, colors, index, locatorMarkSize, params.cols - locatorMarkSize);
+
+                    canvas.restore();
+                } finally {
+                    if (canvas != null) {
+                        surfaceHolder.unlockCanvasAndPost(canvas);
+                    }
                 }
             }
 
@@ -327,24 +421,9 @@ public class TransmitterActivity extends AppCompatActivity {
                 canvas.restore();
                 return index;
             }
-
-            private boolean waitForReceiverResponse() {
-                // currently is mock
-                try {
-                    wait(TimeUnit.SECONDS.toMillis(1));
-                } catch (InterruptedException exc) {
-                    return false;
-                }
-                Log.d(LOG_TAG, "frame #" + sentFrames +
-                        " was successfully sent");
-                if (++sentFrames == FRAMES_PER_BULK) {
-                    sentFrames = 0;
-                    return true;
-                }
-                return false;
-            }
         }
 
+        @SuppressWarnings("RedundantCast")
         private TransmissionParams evaluateTransmissionParams() throws IllegalStateException {
             final Rect frameBounds = getHolder().getSurfaceFrame();
             int height = frameBounds.height() - 2 * TransmissionParams.BORDER_SIZE;
@@ -387,7 +466,8 @@ public class TransmitterActivity extends AppCompatActivity {
             int cols = width / unitSize;
             // center units grid
             PointF leftTopPointOfGrid = new PointF((frameBounds.width() - cols * unitSize) / 2f, (frameBounds.height() - rows * unitSize) / 2f);
-            return new TransmissionParams(unitSize, rows, cols, leftTopPointOfGrid);
+            final int framesPerSecond = 10; // TODO: evaluate this constant too
+            return new TransmissionParams(unitSize, rows, cols, leftTopPointOfGrid, framesPerSecond);
         }
 
         private boolean testReceiverAbilityToRead(int unitSize) {
@@ -396,15 +476,17 @@ public class TransmitterActivity extends AppCompatActivity {
         }
     }
 
-    public enum RequestCode {
-        PERMISSION_REQUEST_RECORD_AUDIO
-    }
-
     private enum TransmissionState {
         CREATING, // generatorFactory == null
         INITIAL, // generatorFactory != null, params == null, drawThread == null, controllerThread == null
         STARTED, // generatorFactory != null, params != null, drawThread != null, controllerThread != null
         FINISHED, // happy path transmission is finished: still generatorFactory != null, params != null, drawThread != null, controllerThread != null
         FAILED // after: now transmission can fail only at evaluating params => generatorFactory != null, params == null, drawThread == null, , controllerThread == null
+    }
+
+    private enum DrawThreadState {
+        WAIT_FOR_BULK,
+        DRAW_BULK,
+        FINISH
     }
 }

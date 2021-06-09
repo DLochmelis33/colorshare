@@ -13,4 +13,5 @@
     <string name="default_file_to_send_message">File to send</string>
     <string name="start_sending">Start sending!</string>
     <string name="receive">Receive</string>
+    <string name="setting_up_text">Setting up transmitter and receiver communication</string>
 </resources>

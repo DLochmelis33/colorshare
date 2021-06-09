@@ -12,7 +12,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Colorshare">
-        <activity android:name=".MockReceiverActivity" />
+        <activity android:name="ru.hse.colorshare.communication.MockReceiverActivity" />
         <activity android:name=".transmitter.TransmitterActivity" />
         <activity
             android:name=".receiver.ReceiverCameraActivity"
