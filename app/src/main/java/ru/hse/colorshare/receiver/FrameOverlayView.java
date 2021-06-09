@@ -42,25 +42,27 @@ public class FrameOverlayView extends View {
 
     private class OverlayFrame extends Drawable {
 
+        private static final float DEFAULT_RATIO = 16f / 9;
+
         private Matrix ul, ur, dr, dl;
         volatile double[] xHints = new double[4];
         volatile double[] yHints = new double[4];
 
         public void resizeToView(int w, int h) {
             Log.d("frameOverlay", "resizing to w=" + w + " h=" + h);
-            double effectiveW = w - 2 * margin;
-            double effectiveH = h - 2 * margin;
-            double resultW = effectiveW;
-            double resultH = effectiveH;
-            double marginX = margin;
-            double marginY = margin;
-            if (effectiveH / effectiveW > ImageProcessor.DEFAULT_RATIO) {
+            float effectiveW = w - 2 * margin;
+            float effectiveH = h - 2 * margin;
+            float resultW = effectiveW;
+            float resultH = effectiveH;
+            float marginX = margin;
+            float marginY = margin;
+            if (effectiveH / effectiveW > DEFAULT_RATIO) {
                 // h is less than max
-                resultH = effectiveW * ImageProcessor.DEFAULT_RATIO;
+                resultH = effectiveW * DEFAULT_RATIO;
                 marginY = (h - resultH) / 2;
             } else {
                 // h is more than max
-                resultW = effectiveH / ImageProcessor.DEFAULT_RATIO;
+                resultW = effectiveH / DEFAULT_RATIO;
                 marginX = (w - resultW) / 2;
             }
 
@@ -69,19 +71,19 @@ public class FrameOverlayView extends View {
             if (underlyingView == null) {
                 return;
             }
-            double viewWidth = underlyingView.getWidth();
-            double viewHeight = underlyingView.getHeight();
-            ul.postTranslate((float) marginX, (float) marginY);
+            float viewWidth = underlyingView.getWidth();
+            float viewHeight = underlyingView.getHeight();
+            ul.postTranslate(marginX, marginY);
             xHints[0] = marginX / viewWidth;
             yHints[0] = marginY / viewHeight;
-            ur.postTranslate((float) (marginX + resultW), (float) marginY);
+            ur.postTranslate(marginX + resultW, marginY);
             xHints[1] = (marginX + resultW) / viewWidth;
             yHints[1] = marginY / viewHeight;
-            dr.postTranslate((float) (marginX + resultW), (float) (marginY + resultH));
-            yHints[2] = (marginX + resultW) / viewHeight;
+            dr.postTranslate(marginX + resultW, marginY + resultH);
+            xHints[2] = (marginX + resultW) / viewWidth;
             yHints[2] = (marginY + resultH) / viewHeight;
-            dl.postTranslate((float) marginX, (float) (marginY + resultH));
-            yHints[3] = marginX / viewHeight;
+            dl.postTranslate(marginX, marginY + resultH);
+            xHints[3] = marginX / viewWidth;
             yHints[3] = (marginY + resultH) / viewHeight;
 
             FrameOverlayView.this.invalidate();
@@ -191,8 +193,8 @@ public class FrameOverlayView extends View {
         float scaleHeight = (float) underlyingView.getHeight() / bitmap.getHeight();
         extrasMtx = new Matrix();
         extrasMtx.postScale(scaleWidth, scaleHeight);
-//        Log.d("xtr", "undW=" + underlyingView.getWidth() + " undH=" + underlyingView.getHeight() +
-//                " bitW=" + bitmap.getWidth() + " bitH=" + bitmap.getHeight());
+        Log.d("FrameOverlay", "undW=" + underlyingView.getWidth() + " undH=" + underlyingView.getHeight() +
+                " bitW=" + bitmap.getWidth() + " bitH=" + bitmap.getHeight());
         invalidate();
     }
 }

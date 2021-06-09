@@ -2,11 +2,8 @@ package ru.hse.colorshare.receiver;
 
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
-import android.graphics.Matrix;
-import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -18,6 +15,8 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
@@ -27,18 +26,12 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
 
 import ru.hse.colorshare.BuildConfig;
+import ru.hse.colorshare.receiver.util.SlidingAverage;
 
 public class CameraService {
 
@@ -54,10 +47,12 @@ public class CameraService {
     private final TextureView previewView;
     private ImageReader imageReader;
 
+    private Handler backgroundHandler;
+    private HandlerThread backgroundThread;
+
     private long lastFrameTime = 0;
-    private long frameTimeSum = 0;
-    private int frameCount = 0;
-    private Queue<Long> timesQueue = new LinkedList<>();
+    private final int fpsWindowSize = 100;
+    private final SlidingAverage fpsCounter = new SlidingAverage(fpsWindowSize);
 
     public CameraService(CameraManager manager, ReceiverCameraActivity startingActivity, TextureView previewView) {
         this.manager = manager;
@@ -74,7 +69,8 @@ public class CameraService {
                 throw new IllegalStateException("was camera permission revoked?");
             }
             this.cameraId = cameraId;
-            manager.openCamera(cameraId, cameraStateCallback, null); // !
+            startBackgroundThread();
+            manager.openCamera(cameraId, cameraStateCallback, null /* will modify UI in this thread */);
         } catch (CameraAccessException e) {
             e.printStackTrace();
             throw new RuntimeException("couldn't open camera " + cameraId);
@@ -88,7 +84,7 @@ public class CameraService {
         assert sizes != null;
         Log.d(TAG, Arrays.toString(sizes));
         for (Size size : sizes) {
-            if(size.getWidth() > 2000) {
+            if (size.getWidth() > 2000) {
                 continue; // too large sizes decrease fps
             }
             double maxTheoreticalFps = 1e9 / config.getOutputMinFrameDuration(previewView.getSurfaceTexture().getClass(), size);
@@ -121,10 +117,10 @@ public class CameraService {
 
                 // choose size of output surface
                 Size preferredSize = calculateMaxThroughputSize(configurations);
-//                Size preferredSize = new Size(256, 144); // magic numbers
+//                Size preferredSize = new Size(256, 144); // ! debug
 
-                int sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
                 // ----- THIS IS CURSED -----
+//                int sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
 //                Log.w(TAG, "sensor orientation = " + sensorOrientation);
 //                if (sensorOrientation == 90 || sensorOrientation == 270) {
 //                    // swap dimensions
@@ -134,8 +130,7 @@ public class CameraService {
 
                 resizePreviewViewToRatio(new Size(preferredSize.getHeight(), preferredSize.getWidth())); // ! ! !
                 previewView.forceLayout();
-                // ! ! !
-                imageReader = ImageReader.newInstance(preferredSize.getHeight(), preferredSize.getWidth(), IMAGE_FORMAT, 2); // 2 is minimum required for acquireLatestImage
+                imageReader = ImageReader.newInstance(preferredSize.getWidth(), preferredSize.getHeight(), IMAGE_FORMAT, 2); // 2 is minimum required for acquireLatestImage
 
                 SurfaceTexture previewSurfaceTexture = previewView.getSurfaceTexture();
                 // ! order ?
@@ -155,11 +150,11 @@ public class CameraService {
                 captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
                 captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE); // ! maybe AF_STATE_ACTIVE_SCAN ?
 
-                captureRequestBuilder.set(CaptureRequest.JPEG_ORIENTATION, sensorOrientation);
+//                captureRequestBuilder.set(CaptureRequest.JPEG_ORIENTATION, sensorOrientation);
 
                 // submit a capture request by creating a session
                 // deprecated (api 30), but no other option (api 23)
-                cameraDevice.createCaptureSession(surfacesList, stateCallback, null);
+                cameraDevice.createCaptureSession(surfacesList, stateCallback, backgroundHandler);
 
             } catch (CameraAccessException e) {
                 e.printStackTrace();
@@ -203,14 +198,12 @@ public class CameraService {
 
                         Image image = imageReader.acquireLatestImage();
                         if (image == null) {
-//                            Log.v(TAG, "null image");
+                            Log.v(TAG, "null image");
                             return;
                         }
                         if (BuildConfig.DEBUG && image.getFormat() != IMAGE_FORMAT) {
                             throw new AssertionError("Image format is wrong");
                         }
-
-                        Log.d(TAG, "image w=" + image.getWidth() + " h=" + image.getHeight());
 
                         // ! probably incompatible with continuous or active AF
 //                        if (result.get(CaptureResult.CONTROL_AF_STATE) != CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED) {
@@ -223,11 +216,10 @@ public class CameraService {
                         int width = image.getWidth();
                         int height = image.getHeight();
                         int bytesSize = imgBuffer.remaining();
-                        byte[] imgBytes = new byte[bytesSize]; // ! ?
+                        byte[] imgBytes = new byte[bytesSize];
                         imgBuffer.get(imgBytes, 0, bytesSize);
                         image.close(); // ASAP
 
-//                        Log.d(TAG, "image width = " + width + ", height = " + height);
                         ImageProcessor.process(new ImageProcessor.Task(imgBytes, width, height, startingActivity.getHints(),
                                 startingActivity.getReceivingStatusHandler(), startingActivity.getApplicationContext()));
 
@@ -238,28 +230,16 @@ public class CameraService {
                         long newFrameTime = System.currentTimeMillis();
                         long delta = newFrameTime - lastFrameTime;
                         lastFrameTime = newFrameTime;
-                        frameTimeSum += delta;
-                        frameCount++;
-                        timesQueue.add(delta);
-                        if (frameCount < 100) {
-                            return;
-                        }
-                        if (timesQueue.peek() == null) {
-                            timesQueue.clear();
-                            frameCount = 0;
-                            frameTimeSum = 0;
-                            return;
-                        }
-                        frameTimeSum -= timesQueue.poll(); // no NPE, see previous 'if'
-                        frameCount--;
-                        Log.v("FPS", String.valueOf(1000.0 * frameCount / frameTimeSum));
+                        fpsCounter.addValue(delta);
+
+                        Log.v("FPS", String.valueOf(1000.0 * fpsWindowSize / fpsCounter.getSum()));
                     }
 
                     @Override
                     public void onCaptureSequenceCompleted(@NonNull CameraCaptureSession session, int sequenceId, long frameNumber) {
                         super.onCaptureSequenceCompleted(session, sequenceId, frameNumber);
                     }
-                }, null);
+                }, backgroundHandler);
 
             } catch (CameraAccessException e) {
                 e.printStackTrace();
@@ -299,6 +279,27 @@ public class CameraService {
         if (imageReader != null) {
             imageReader.close();
             imageReader = null;
+        }
+        if (backgroundHandler != null && backgroundThread != null) {
+            stopBackgroundThread();
+        }
+    }
+
+
+    private void startBackgroundThread() {
+        backgroundThread = new HandlerThread("CameraBackground");
+        backgroundThread.start();
+        backgroundHandler = new Handler(backgroundThread.getLooper());
+    }
+
+    private void stopBackgroundThread() {
+        backgroundThread.quitSafely();
+        try {
+            backgroundThread.join();
+            backgroundThread = null;
+            backgroundHandler = null;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 

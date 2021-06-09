@@ -8,21 +8,18 @@ import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.util.Size;
 import android.view.TextureView;
-import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import java.util.Arrays;
 import java.util.Comparator;
 
 import ru.hse.colorshare.BuildConfig;
@@ -34,7 +31,6 @@ public class ReceiverCameraActivity extends AppCompatActivity {
     private static final String TAG = "ReceiverCameraActivity";
 
     private CameraService cameraService;
-    private TextView dummyTextView;
     private FrameOverlayView frameOverlayView;
 
     public Handler getReceivingStatusHandler() {
@@ -46,12 +42,12 @@ public class ReceiverCameraActivity extends AppCompatActivity {
     private static final int cameraPermissionRequestCode = 55555; // !
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    protected void onResume() {
+        super.onResume();
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, cameraPermissionRequestCode);
         } else {
-            init(savedInstanceState);
+            init();
         }
     }
 
@@ -60,7 +56,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == cameraPermissionRequestCode) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                init(null);
+                init();
             } else {
                 Toast.makeText(this, "Camera permission is required, please grant it.", Toast.LENGTH_LONG).show();
                 this.finish();
@@ -68,7 +64,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         }
     }
 
-    private void init(Bundle savedInstanceState) {
+    private void init() {
         setContentView(R.layout.activity_reciever_camera);
 
         // android-style assert
@@ -81,7 +77,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         cameraTextureView.setOverlayView(frameOverlayView);
         frameOverlayView.setUnderlyingView(cameraTextureView);
 
-        dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
+        TextView dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
         cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView);
 
         receivingStatusHandler = new Handler(Looper.myLooper()) {
@@ -105,6 +101,9 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             @Override
             public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
                 cameraService.tryOpenCamera(cameraId);
+
+                // ! debug
+//                ImageProcessor.getInstance().setGridSize(30, 50);
             }
 
             @Override
@@ -128,25 +127,15 @@ public class ReceiverCameraActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
         cameraService.closeCamera();
-//        ImageProcessor.getInstance().EXECUTOR.shutdownNow();
+        ImageProcessor.getInstance().shutdown();
     }
 
     public RelativePoint[] getHints() {
         return frameOverlayView.getCornersHints();
     }
 
-    // returns a camera that 1) is not monochrome 2) is of largest sensor area
+    // returns a camera that 1) faces backwards and is not monochrome 2) is of largest sensor area
     private String chooseCamera() {
         try {
             String bestCameraId = null;

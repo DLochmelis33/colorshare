@@ -4,29 +4,25 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.os.Handler;
 import android.os.Message;
 import android.renderscript.Allocation;
-import android.renderscript.Element;
 import android.renderscript.RenderScript;
-import android.renderscript.ScriptIntrinsicYuvToRGB;
-import android.renderscript.Type;
 import android.util.Log;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import ru.hse.colorshare.receiver.util.RelativePoint;
+import ru.hse.colorshare.receiver.util.SlidingAverage;
+import ru.hse.colorshare.rs.ScriptC_rotator;
 
 public class ImageProcessor {
 
@@ -35,9 +31,9 @@ public class ImageProcessor {
     public static class Task implements Runnable {
 
         private final String TAG;
-        private static AtomicInteger cnt = new AtomicInteger(0);
+        private static final AtomicInteger cnt = new AtomicInteger(0);
 
-        private static final long TIMEOUT = 1000;
+        private static final long TIMEOUT = 2000;
 
         private final Handler resultHandler;
         private byte[] imageBytes;
@@ -58,32 +54,47 @@ public class ImageProcessor {
         }
 
         // call after any long operation
-        private boolean isOutdated() {
-            return System.currentTimeMillis() - creationTime > TIMEOUT;
+        private boolean isOutdated(String msg) {
+            if (System.currentTimeMillis() - creationTime > TIMEOUT) {
+                Log.w(TAG, "outdated after having " + msg);
+                return true;
+            }
+            return false;
         }
 
         @Override
         public void run() {
             long startTime = System.currentTimeMillis();
+            Log.v(TAG, "ms elapsed before start: " + (startTime - creationTime));
+            if (startTime - creationTime > TIMEOUT) {
+                Log.w(TAG, "outdated before start!");
+                return;
+            }
 
-            Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+            while (!getInstance().isInit.get()) {
+                getInstance().init(context);
+            }
+
+            Bitmap bitmap = getInstance().rotate(BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length));
             if (bitmap == null) {
-                Log.w(TAG, "could not decode bitmap");
+                if (getInstance().isInit.get()) {
+                    Log.w(TAG, "could not decode bitmap");
+                } // else is part of shutting down
                 return;
             }
             imageBytes = null; // help GC
             System.gc();
 
-            Log.d(TAG, "width=" + width + " height=" + height + " bitmap.width=" + bitmap.getWidth() + " bitmap.height=" + bitmap.getHeight());
+//            Log.d(TAG, "width=" + width + " height=" + height + " bitmap.width=" + bitmap.getWidth() + " bitmap.height=" + bitmap.getHeight());
 
             ColorExtractor.LocatorResult[] locators = ColorExtractor.findLocators(bitmap, hints);
-            if (isOutdated()) {
-                Log.d(TAG, "outdated after finding locators");
+            if (isOutdated("locators found")) {
                 return;
             }
             Log.d(TAG, Arrays.toString(locators));
 
-            Bitmap extrasBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            // ! ! !
+            Bitmap extrasBitmap = Bitmap.createBitmap(height, width, Bitmap.Config.ARGB_8888);
             Canvas extrasCanvas = new Canvas(extrasBitmap);
             Paint extrasPaint = new Paint();
             extrasPaint.setARGB(150, 20, 100, 255);
@@ -92,24 +103,45 @@ public class ImageProcessor {
                     extrasCanvas.drawCircle(res.x, res.y, 30, extrasPaint);
                 }
             }
-            if (isOutdated()) {
-                Log.d(TAG, "outdated after creating extrasBitmap");
+            if (isOutdated("extrasBitmap created")) {
                 return;
             }
 
             // ! debug
-            Paint hp = new Paint();
-            hp.setARGB(150, 240, 240, 30);
-            for (RelativePoint rp : hints) {
-                extrasCanvas.drawCircle((float) (rp.x * width), (float) (rp.y * height), 30, hp);
+//            Paint hp = new Paint();
+//            hp.setARGB(150, 240, 240, 30);
+//            for (RelativePoint rp : hints) {
+//                extrasCanvas.drawCircle((float) (rp.x * width), (float) (rp.y * height), 30, hp);
+//            }
+
+            ArrayList<Integer> colors = ColorExtractor.extractColorsFromResult(bitmap, locators, getInstance().gridWidth, getInstance().gridHeight);
+            if (colors != null) {
+                boolean correct = true;
+                for (int i = 0; i < colors.size(); i++) {
+                    correct = ((i % 2 == 0) == ColorExtractor.BitmapBinaryWrapper.roundColorBW(colors.get(i)));
+                    if (!correct) {
+                        break;
+                    }
+                }
+
+                // ! debug
+//                Log.d(TAG, "success=" + correct);
+
+                if (isOutdated("colors checked")) {
+                    return;
+                }
+            } else {
+                Log.d(TAG, "no colors");
             }
-            // ! debug end
 
 //            // TODO
             Message msg = Message.obtain(resultHandler, 0, extrasBitmap);
             // String.format("#%06X", (0xFFFFFF & bitmap.getPixel(0, 0)))
             msg.sendToTarget();
-            Log.d(TAG, "working ms=" + (System.currentTimeMillis() - startTime));
+
+            long workTime = System.currentTimeMillis() - startTime;
+            getInstance().taskTimeCounter.addValue(workTime);
+            Log.v(TAG, "avg working ms = " + getInstance().taskTimeCounter.getAverage());
         }
 
     }
@@ -131,30 +163,81 @@ public class ImageProcessor {
     public static void process(Task t) {
         Runtime runtime = Runtime.getRuntime();
         long availHeapSize = runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory());
-        if (availHeapSize <= 6 * 1024 * 1024) { // on my phone one image is around 4MB
-            Log.w(TAG, "dumping tasks");
-
+        if (availHeapSize <= 6 * 1024 * 1024 /* on my phone one image is around 4MB */) {
+            Log.w(TAG, "dumping tasks: approaching OOM");
             getInstance().executor.purge();
-
-            // ! sometimes gets stuck, why though?
-//            for(int i = 0; i < 10; i++) {
-//                try {
-//                    getInstance().tasksQueue.take();
-//                } catch (InterruptedException e) {
-//                    // ignored
-//                }
-//            }
+        }
+        if (getInstance().tasksQueue.size() > 10) {
+            Log.w(TAG, "dumping tasks: too many tasks queued");
+            getInstance().executor.purge();
         }
 
         getInstance().executor.execute(t);
     }
 
+    private final SlidingAverage taskTimeCounter = new SlidingAverage(10);
+
+    private volatile int gridWidth = -1;
+    private volatile int gridHeight = -1;
+
+    public void setGridSize(int gridWidth, int gridHeight) {
+        this.gridWidth = gridWidth;
+        this.gridHeight = gridHeight;
+    }
+
 // ----------- image processing methods below -----------
 
-    public static final double DEFAULT_RATIO = 16.0 / 9.0;
+    private RenderScript rs;
+    private ScriptC_rotator script;
+    private final AtomicBoolean isInit = new AtomicBoolean(false);
 
-    public synchronized void init(int width, int height, int length, Context context) {
+    public synchronized void init(Context context) {
+        if (isInit.get()) {
+            return;
+        }
+        Log.d(TAG, "initializing");
+        rs = RenderScript.create(context);
+        script = new ScriptC_rotator(rs);
+        isInit.set(true);
+    }
 
+    public synchronized void shutdown() {
+        if (!isInit.get()) {
+            return;
+        }
+        executor.shutdownNow();
+        isInit.set(false);
+    }
+
+    public Bitmap rotate(Bitmap bitmap) {
+        if (!isInit.get()) {
+//            throw new IllegalStateException();
+            return null;
+        }
+        script.set_inWidth(bitmap.getWidth());
+        script.set_inHeight(bitmap.getHeight());
+        Allocation sourceAllocation = Allocation.createFromBitmap(rs, bitmap,
+                Allocation.MipmapControl.MIPMAP_NONE,
+                Allocation.USAGE_SCRIPT);
+        script.set_inImage(sourceAllocation);
+
+        int targetHeight = bitmap.getWidth();
+        int targetWidth = bitmap.getHeight();
+        Bitmap.Config config = bitmap.getConfig();
+        bitmap.recycle();
+        Bitmap target = Bitmap.createBitmap(targetWidth, targetHeight, config);
+        final Allocation targetAllocation = Allocation.createFromBitmap(rs, target,
+                Allocation.MipmapControl.MIPMAP_NONE,
+                Allocation.USAGE_SCRIPT);
+        script.forEach_rotate_270_clockwise(targetAllocation, targetAllocation);
+        targetAllocation.copyTo(target);
+
+        sourceAllocation.destroy();
+        targetAllocation.destroy();
+        return target;
+    }
+
+//    public synchronized void init(int width, int height, int length, Context context) {
 //        RenderScript rs = RenderScript.create(context);
 //        script = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
 //
@@ -165,10 +248,8 @@ public class ImageProcessor {
 //        Type.Builder rgbaType = new Type.Builder(rs, Element.RGBA_8888(rs)).setX(width).setY(height);
 //        out = Allocation.createTyped(rs, rgbaType.create(), Allocation.USAGE_SCRIPT);
 //        assert out != null;
+//    }
 
-    }
-
-//    // ! copypasted from https://blog.minhazav.dev/how-to-convert-yuv-420-sp-android.media.Image-to-Bitmap-or-jpeg/
 //    private Bitmap yuv420ToBitmap(byte[] yuvByteArray) {
 //        in.copyFrom(yuvByteArray);
 //        script.setInput(in);

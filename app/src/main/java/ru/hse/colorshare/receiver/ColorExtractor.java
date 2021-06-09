@@ -287,13 +287,13 @@ public class ColorExtractor {
         private volatile static long lastResultTime = 0;
         private static final long LAST_RESULT_TIMEOUT = 1000;
 
-        private static void updateLastResult(@NonNull LocatorResult[] newResult) {
+        private static void update(@NonNull LocatorResult[] newResult) {
             lastResult = newResult;
             lastResultTime = System.currentTimeMillis();
         }
 
         @Nullable
-        private static LocatorResult[] getLastResult() {
+        private static LocatorResult[] get() {
             if (lastResult != null && System.currentTimeMillis() - lastResultTime > LAST_RESULT_TIMEOUT) {
                 lastResult = null;
             }
@@ -312,7 +312,7 @@ public class ColorExtractor {
         LocatorResult[] results = new LocatorResult[4];
         for (int i = 0; i < 4; i++) {
             Point hint = new Point((int) (wrapper.getWidth() * hints[i].x), (int) (wrapper.getHeight() * hints[i].y));
-            LocatorResult[] lastResult = LastResult.getLastResult();
+            LocatorResult[] lastResult = LastResult.get();
             if (lastResult != null && lastResult[i] != null) {
                 results[i] = findLocator(wrapper, hint, HintPos.fromIndex(i), new Point(lastResult[i].x, lastResult[i].y), lastResult[i].unit);
             } else {
@@ -322,7 +322,7 @@ public class ColorExtractor {
 //                return null;
 //            }
         }
-        LastResult.updateLastResult(results);
+        LastResult.update(results);
         return results;
     }
 
@@ -437,13 +437,7 @@ public class ColorExtractor {
     }
 
     @Nullable
-    public static ArrayList<Integer> extractColors(Bitmap img, RelativePoint[] hints) {
-        return extractColors(img, hints, -1, -1);
-    }
-
-    @Nullable
-    public static ArrayList<Integer> extractColors(Bitmap img, RelativePoint[] hints, int gridWidth, int gridHeight) {
-        LocatorResult[] locators = findLocators(img, hints);
+    public static ArrayList<Integer> extractColorsFromResult(Bitmap img, @NonNull LocatorResult[] locators, int gridWidth, int gridHeight) {
         for (LocatorResult lr : locators) {
             if (lr == null) {
                 return null;
@@ -477,8 +471,18 @@ public class ColorExtractor {
                 gridCornerUL, gridCornerUR, gridCornerDR, gridCornerDL,
                 gridWidth, gridHeight
         );
-
         return extractFromGrid(img, gridMapper, avgUnit);
+    }
+
+    @Nullable
+    public static ArrayList<Integer> extractColors(Bitmap img, RelativePoint[] hints) {
+        return extractColors(img, hints, -1, -1);
+    }
+
+    @Nullable
+    public static ArrayList<Integer> extractColors(Bitmap img, RelativePoint[] hints, int gridWidth, int gridHeight) {
+        LocatorResult[] locators = findLocators(img, hints);
+        return extractColorsFromResult(img, locators, gridWidth, gridHeight);
     }
 
     private static ArrayList<Integer> extractFromGrid(Bitmap img, GridMapper gridMapper, double avgUnit) {
