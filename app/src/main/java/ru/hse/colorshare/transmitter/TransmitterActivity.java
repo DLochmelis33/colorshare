@@ -171,7 +171,8 @@ public class TransmitterActivity extends AppCompatActivity {
         public void surfaceDestroyed(SurfaceHolder holder) {
             boolean retry = true;
             if (state.equals(TransmissionState.STARTED) || state.equals(TransmissionState.FINISHED)) {
-                assert drawThread != null && controllerThread != null;
+                assert drawThread != null && controllerThread != null && communicator != null;
+                communicator.stopWorking();
                 drawThreadStateLock.lock();
                 try {
                     drawThreadState = DrawThreadState.FINISH;
@@ -181,6 +182,7 @@ public class TransmitterActivity extends AppCompatActivity {
                 }
                 while (retry) {
                     try {
+                        controllerThread.interrupt();
                         controllerThread.join();
                         drawThread.join();
                         retry = false;
@@ -203,7 +205,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     return;
                 }
 
-                while (true) {
+                while (!isInterrupted()) {
                     long[] bulkChecksums;
                     int bulkIndex;
                     drawThreadStateLock.lock();
@@ -235,7 +237,7 @@ public class TransmitterActivity extends AppCompatActivity {
                         drawThreadStateLock.unlock();
                     }
 
-                    if(!sendBulkInfoAndWaitForReceiverResponse(uniqueTransmitterKey, uniqueReceiverKey, bulkIndex, bulkChecksums, buffer)) {
+                    if (!sendBulkInfoAndWaitForReceiverResponse(uniqueTransmitterKey, uniqueReceiverKey, bulkIndex, bulkChecksums, buffer)) {
                         return;
                     }
                 }

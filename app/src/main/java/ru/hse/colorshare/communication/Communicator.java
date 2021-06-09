@@ -22,4 +22,6 @@ public interface Communicator extends Closeable {
 
     // returns received message length in bytes
     int blockingReceive(@NonNull byte[] receivedMessageBuffer, long blockingTimeoutInSeconds) throws IOException;
+
+    void stopWorking();
 }

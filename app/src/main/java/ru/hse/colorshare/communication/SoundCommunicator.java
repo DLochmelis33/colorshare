@@ -74,4 +74,12 @@ public class SoundCommunicator implements Communicator {
         }
         Log.d(LOG_TAG, "SoundCommunicator was successfully closed");
     }
+
+    @Override
+    public void stopWorking() {
+        if (transmitter != null) {
+            transmitter.terminate(10);
+        }
+        Log.d(LOG_TAG, "SoundCommunicator was stopped");
+    }
 }
