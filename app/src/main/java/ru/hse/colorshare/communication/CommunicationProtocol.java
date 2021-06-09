@@ -54,7 +54,7 @@ public class CommunicationProtocol {
         public final TransmissionState transmissionState;
         public final int bulkIndex;
         public final int gridRows; // in units
-        public final int gridCols; // int units
+        public final int gridCols; // in units
         public final long[] checksums;
 
         private TransmitterMessage(long uniqueTransmissionKey, TransmissionState transmissionState, int bulkIndex, int gridRows, int gridCols, long[] checksums) {

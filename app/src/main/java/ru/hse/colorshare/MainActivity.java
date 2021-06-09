@@ -69,7 +69,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void onClickReceive(View view) {
         Log.d(LOG_TAG, "Start ReceiverCameraActivity");
-        Intent intent = new Intent(this, ru.hse.colorshare.MockReceiverActivity.class);
+        Intent intent = new Intent(this, ru.hse.colorshare.communication.MockReceiverActivity.class);
         startActivity(intent);
     }
 
@@ -118,6 +118,9 @@ public class MainActivity extends AppCompatActivity {
                         Toast.makeText(getApplicationContext(), "File was successfully sent!", Toast.LENGTH_LONG).show();
                         break;
                     case CANCELED:
+                        break;
+                    case FAILED_TO_GET_RECORD_AUDIO_PERMISSION:
+                        Toast.makeText(getApplicationContext(), "File sending failed: record audio permission was not granted, try again", Toast.LENGTH_LONG).show();
                         break;
                     case FAILED_TO_READ_FILE:
                         Toast.makeText(getApplicationContext(), "File sending failed: failed to read file, try again", Toast.LENGTH_LONG).show();
@@ -174,8 +177,9 @@ public class MainActivity extends AppCompatActivity {
     public enum TransmissionResultCode {
         SUCCEED(Activity.RESULT_OK),
         CANCELED(Activity.RESULT_CANCELED),
-        FAILED_TO_READ_FILE(4),
-        FAILED_TO_GET_TRANSMISSION_PARAMS(5);
+        FAILED_TO_GET_RECORD_AUDIO_PERMISSION(4),
+        FAILED_TO_READ_FILE(5),
+        FAILED_TO_GET_TRANSMISSION_PARAMS(6);
 
         public final int value;
         private static final Map<Integer, TransmissionResultCode> map = new HashMap<>();

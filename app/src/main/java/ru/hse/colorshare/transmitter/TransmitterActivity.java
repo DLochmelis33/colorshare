@@ -1,11 +1,14 @@
 package ru.hse.colorshare.transmitter;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -17,10 +20,6 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-
-import org.quietmodem.Quiet.FrameTransmitter;
-import org.quietmodem.Quiet.FrameTransmitterConfig;
-import org.quietmodem.Quiet.ModemException;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -72,6 +71,9 @@ public class TransmitterActivity extends AppCompatActivity {
                     }
                 });
 
+        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},
+                RequestCode.PERMISSION_REQUEST_RECORD_AUDIO.ordinal());
+        assert checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
         communicator = Communicator.getColorShareTransmitterSideCommunicator(this);
 
         enterFullscreenAndLockOrientation();
@@ -88,6 +90,22 @@ public class TransmitterActivity extends AppCompatActivity {
                 | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_FULLSCREEN);
+    }
+
+    @SuppressWarnings("SwitchStatementWithTooFewBranches")
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        switch (RequestCode.values()[requestCode]) {
+            case PERMISSION_REQUEST_RECORD_AUDIO: {
+                if (!(grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+                    setResult(MainActivity.TransmissionResultCode.FAILED_TO_GET_RECORD_AUDIO_PERMISSION.value, new Intent());
+                    finish();
+                }
+            }
+        }
     }
 
     @Override
@@ -110,6 +128,8 @@ public class TransmitterActivity extends AppCompatActivity {
         private DrawThread drawThread;
         private TransmissionControllerThread controllerThread;
         private final AtomicBoolean running = new AtomicBoolean(true);
+
+        private DataFrameBulk currentBulk;
 
         private int sentFrames = 0; // need only for mock testing
 
@@ -166,7 +186,9 @@ public class TransmitterActivity extends AppCompatActivity {
             boolean retry = true;
             if (state.equals(TransmissionState.STARTED) || state.equals(TransmissionState.FINISHED)) {
                 assert drawThread != null && controllerThread != null;
-                running.set(false);
+                synchronized (running) {
+                    running.set(false);
+                }
                 while (retry) {
                     try {
                         controllerThread.join();
@@ -179,58 +201,14 @@ public class TransmitterActivity extends AppCompatActivity {
             Log.d(LOG_TAG, "DrawView destroyed");
         }
 
-        private TransmissionParams evaluateTransmissionParams() throws IllegalStateException {
-            final Rect frameBounds = getHolder().getSurfaceFrame();
-            int height = frameBounds.height() - 2 * TransmissionParams.BORDER_SIZE;
-            int width = frameBounds.width() - 2 * TransmissionParams.BORDER_SIZE;
-            // a = height; b = width; d = unitSize;
-            // a/d * b/d approx EXPECTED_FRAME_SIZE
-            int startUnitSize = (int) Math.sqrt((double) ((height * width) / TransmissionParams.EXPECTED_FRAME_SIZE_IN_UNITS));
-
-            // 1 <= d && MIN_UNITS_IN_LINE <= min(a,b)/d
-            int minUnitSize = 0; // non-inclusive
-            int maxUnitSize = Math.min(height, width) / TransmissionParams.MIN_UNITS_IN_LINE; // inclusive
-            startUnitSize = Math.min(maxUnitSize, startUnitSize);
-            Log.d(LOG_TAG, "Start getting transmission params: frame bounds = " + frameBounds.height() + " x " + frameBounds.width() +
-                    "; border size = " + TransmissionParams.BORDER_SIZE + "; start unit size = " + startUnitSize +
-                    "; max unit size = " + maxUnitSize);
-
-            // prepare to binary search
-            if (!testReceiverAbilityToRead(maxUnitSize)) {
-                throw new IllegalStateException("receiver is unable to read maxUnitSize grid");
-            }
-            int left = minUnitSize; // non-inclusive
-            int right = maxUnitSize; // inclusive
-            if (testReceiverAbilityToRead(startUnitSize)) {
-                right = startUnitSize;
-            } else {
-                left = startUnitSize;
-            }
-            // binary search
-            while (right - left > 1) {
-                int mid = (left + right) / 2;
-                if (testReceiverAbilityToRead(mid)) {
-                    right = mid;
-                } else {
-                    left = mid;
-                }
-            }
-            Log.d(LOG_TAG, "Getting transmission params: binary search finished with left = " + left + ", right = " + right);
-            int unitSize = right;
-            int rows = height / unitSize;
-            int cols = width / unitSize;
-            // center units grid
-            PointF leftTopPointOfGrid = new PointF((frameBounds.width() - cols * unitSize) / 2f, (frameBounds.height() - rows * unitSize) / 2f);
-            return new TransmissionParams(unitSize, rows, cols, leftTopPointOfGrid);
-        }
-
-        private boolean testReceiverAbilityToRead(int unitSize) {
-            // TODO: add test messaging with receiver
-            return unitSize >= 40; // mock for now
-        }
-
         private class TransmissionControllerThread extends Thread {
+            public TransmissionControllerThread() {
+            }
 
+            @Override
+            public void run() {
+
+            }
         }
 
         private class DrawThread extends Thread {
@@ -312,7 +290,7 @@ public class TransmitterActivity extends AppCompatActivity {
                             }
                         }
                         boolean response;
-                        synchronized (this) {
+                        synchronized (running) {
                             if (!running.get()) {
                                 return;
                             }
@@ -366,6 +344,60 @@ public class TransmitterActivity extends AppCompatActivity {
                 return false;
             }
         }
+
+        private TransmissionParams evaluateTransmissionParams() throws IllegalStateException {
+            final Rect frameBounds = getHolder().getSurfaceFrame();
+            int height = frameBounds.height() - 2 * TransmissionParams.BORDER_SIZE;
+            int width = frameBounds.width() - 2 * TransmissionParams.BORDER_SIZE;
+            // a = height; b = width; d = unitSize;
+            // a/d * b/d approx EXPECTED_FRAME_SIZE
+            int startUnitSize = (int) Math.sqrt((double) ((height * width) / TransmissionParams.EXPECTED_FRAME_SIZE_IN_UNITS));
+
+            // 1 <= d && MIN_UNITS_IN_LINE <= min(a,b)/d
+            int minUnitSize = 0; // non-inclusive
+            int maxUnitSize = Math.min(height, width) / TransmissionParams.MIN_UNITS_IN_LINE; // inclusive
+            startUnitSize = Math.min(maxUnitSize, startUnitSize);
+            Log.d(LOG_TAG, "Start getting transmission params: frame bounds = " + frameBounds.height() + " x " + frameBounds.width() +
+                    "; border size = " + TransmissionParams.BORDER_SIZE + "; start unit size = " + startUnitSize +
+                    "; max unit size = " + maxUnitSize);
+
+            // prepare to binary search
+            if (!testReceiverAbilityToRead(maxUnitSize)) {
+                throw new IllegalStateException("receiver is unable to read maxUnitSize grid");
+            }
+            int left = minUnitSize; // non-inclusive
+            int right = maxUnitSize; // inclusive
+            if (testReceiverAbilityToRead(startUnitSize)) {
+                right = startUnitSize;
+            } else {
+                left = startUnitSize;
+            }
+            // binary search
+            while (right - left > 1) {
+                int mid = (left + right) / 2;
+                if (testReceiverAbilityToRead(mid)) {
+                    right = mid;
+                } else {
+                    left = mid;
+                }
+            }
+            Log.d(LOG_TAG, "Getting transmission params: binary search finished with left = " + left + ", right = " + right);
+            int unitSize = right;
+            int rows = height / unitSize;
+            int cols = width / unitSize;
+            // center units grid
+            PointF leftTopPointOfGrid = new PointF((frameBounds.width() - cols * unitSize) / 2f, (frameBounds.height() - rows * unitSize) / 2f);
+            return new TransmissionParams(unitSize, rows, cols, leftTopPointOfGrid);
+        }
+
+        private boolean testReceiverAbilityToRead(int unitSize) {
+            // TODO: add test messaging with receiver
+            return unitSize >= 40; // mock for now
+        }
+    }
+
+    public enum RequestCode {
+        PERMISSION_REQUEST_RECORD_AUDIO
     }
 
     private enum TransmissionState {

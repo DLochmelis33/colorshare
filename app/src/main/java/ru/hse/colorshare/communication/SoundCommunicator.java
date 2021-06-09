@@ -1,7 +1,9 @@
 package ru.hse.colorshare.communication;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -24,7 +26,9 @@ public class SoundCommunicator implements Communicator {
 
     private static final String LOG_TAG = "ColorShare:communicator";
 
+    @SuppressLint("Assert")
     protected SoundCommunicator(@NonNull Context context, @NonNull String transmitterProfileKey, @NonNull String receiverProfileKey) {
+        assert context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
         try {
             transmitterConfig = new FrameTransmitterConfig(context, transmitterProfileKey);
             receiverConfig = new FrameReceiverConfig(context, receiverProfileKey);
