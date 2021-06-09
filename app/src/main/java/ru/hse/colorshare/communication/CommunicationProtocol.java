@@ -18,15 +18,21 @@ public class CommunicationProtocol {
         public final long uniqueTransmissionKey;
         public final long fileToSendSize;
 
+        private static final String helloString = "colorshare hello message";
+
         private HelloMessage(long uniqueTransmissionKey, long fileToSendSize) {
             this.uniqueTransmissionKey = uniqueTransmissionKey;
             this.fileToSendSize = fileToSendSize;
         }
 
+        @SuppressLint("Assert")
         private HelloMessage(byte[] byteArray, int length) {
             ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray, 0, length);
             uniqueTransmissionKey = byteBuffer.getLong();
             fileToSendSize = byteBuffer.getLong();
+            byte[] helloStringBuffer = new byte[helloString.length()];
+            byteBuffer.get(helloStringBuffer);
+            assert Arrays.equals(helloStringBuffer, helloString.getBytes());
         }
 
         public static HelloMessage create(long uniqueTransmissionKey, long fileToSendSize) {
@@ -44,11 +50,20 @@ public class CommunicationProtocol {
             ByteBuffer byteBuffer = ByteBuffer.allocate(getSizeInBytes());
             byteBuffer.putLong(uniqueTransmissionKey);
             byteBuffer.putLong(fileToSendSize);
+            byteBuffer.put(helloString.getBytes());
             return byteBuffer.array();
         }
 
+        @NonNull
+        @Override
+        public String toString() {
+            return "Hello colorshare message: " + "\n" +
+                    "uniqueTransmissionKey = " + uniqueTransmissionKey + "\n" +
+                    "fileToSendSize = " + fileToSendSize + "\n";
+        }
+
         public static int getSizeInBytes() {
-            return 2 * Long.SIZE / 8;
+            return 2 * Long.SIZE / 8 + helloString.length();
         }
     }
 
