@@ -3,12 +3,12 @@ package ru.hse.colorshare.coding.decoding.impl;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import ru.hse.colorshare.coding.decoding.DecodingPreprocessor;
+import ru.hse.colorshare.coding.decoding.DecodingPostprocessor;
 
-public class SimpleDecodingPreprocessor implements DecodingPreprocessor {
+public class SimpleDecodingPostprocessor implements DecodingPostprocessor {
     private final OutputStream outputStream;
 
-    public SimpleDecodingPreprocessor(OutputStream outputStream) {
+    public SimpleDecodingPostprocessor(OutputStream outputStream) {
         this.outputStream = outputStream;
     }
 
