@@ -131,9 +131,10 @@ public class MockReceiverActivity extends AppCompatActivity {
         CommunicationProtocol.HelloMessage receivedHelloMessage;
         while (true) {
             Log.d(LOG_TAG, "Receive attempt #" + attempt);
-            final int blockingReceiveTimeout = 100;
+            final int blockingReceiveTimeout = 10;
             try {
-                receivedHelloMessage = CommunicationProtocol.HelloMessage.parseFromByteArray(buffer, communicator.blockingReceive(buffer, blockingReceiveTimeout));
+                int receivedBytes = communicator.blockingReceive(buffer, blockingReceiveTimeout);
+                receivedHelloMessage = CommunicationProtocol.HelloMessage.parseFromByteArray(buffer, receivedBytes);
                 assert receivedHelloMessage != null;
                 Log.d(LOG_TAG, "Hello message attempt #" + attempt + " was successfully received: " + receivedHelloMessage);
                 break;
@@ -154,17 +155,17 @@ public class MockReceiverActivity extends AppCompatActivity {
         long fileToSendSize = receivedHelloMessage.fileToSendSize;
         CommunicationProtocol.HelloMessage helloMessageToSend = CommunicationProtocol.HelloMessage.create(uniqueReceiverKey, fileToSendSize);
 
-        final int maxPairingAttempts = 5;
-        for (int i = 0; i < maxPairingAttempts; i++) {
-            Log.d(LOG_TAG, "Send hello attempt #" + i);
-            try {
-                final int blockingSendTimeout = 2;
-                communicator.blockingSend(helloMessageToSend.toByteArray(), blockingSendTimeout);
-            } catch (IOException ioException) {
-                Log.d(LOG_TAG, "Blocking send of hello message attempt #" + i + " IOException: " + ioException.getMessage());
-                continue;
-            }
-            Log.d(LOG_TAG, "Hello message attempt #" + i + " was successfully sent: " + helloMessageToSend);
-        }
+//        final int maxPairingAttempts = 5;
+//        for (int i = 0; i < maxPairingAttempts; i++) {
+//            Log.d(LOG_TAG, "Send hello attempt #" + i);
+//            try {
+//                final int blockingSendTimeout = 2;
+//                communicator.blockingSend(helloMessageToSend.toByteArray(), blockingSendTimeout);
+//            } catch (IOException ioException) {
+//                Log.d(LOG_TAG, "Blocking send of hello message attempt #" + i + " IOException: " + ioException.getMessage());
+//                continue;
+//            }
+//            Log.d(LOG_TAG, "Hello message attempt #" + i + " was successfully sent: " + helloMessageToSend);
+//        }
     }
 }

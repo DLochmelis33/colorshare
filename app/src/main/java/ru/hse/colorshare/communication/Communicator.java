@@ -10,12 +10,12 @@ import java.io.IOException;
 public interface Communicator extends Closeable {
     static @NonNull
     Communicator getColorShareTransmitterSideCommunicator(@NonNull Context context) {
-        return new SoundCommunicator(context, "audible-7k-channel-0", "audible-7k-channel-0");
+        return new SoundCommunicator(context, "audible-7k-channel-0", "audible-7k-channel-1");
     }
 
     static @NonNull
     Communicator getColorShareReceiverSideCommunicator(@NonNull Context context) {
-        return new SoundCommunicator(context, "audible-7k-channel-0", "audible-7k-channel-0");
+        return new SoundCommunicator(context, "audible-7k-channel-1", "audible-7k-channel-0");
     }
 
     void blockingSend(@NonNull byte[] toSendMessage, long blockingTimeoutInSeconds) throws IOException;
