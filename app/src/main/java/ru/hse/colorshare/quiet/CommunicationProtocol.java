@@ -1,4 +1,4 @@
-package ru.hse.colorshare.communication;
+package ru.hse.colorshare.quiet;
 
 import android.annotation.SuppressLint;
 
@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import ru.hse.colorshare.coding.encoding.DataFrameBulk;
 import ru.hse.colorshare.transmitter.TransmissionParams;
 
 public class CommunicationProtocol {

@@ -1,4 +1,4 @@
-package ru.hse.colorshare.communication;
+package ru.hse.colorshare.quiet;
 
 import android.annotation.SuppressLint;
 import android.content.Context;

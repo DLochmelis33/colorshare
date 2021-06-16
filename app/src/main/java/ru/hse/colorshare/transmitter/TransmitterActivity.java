@@ -22,9 +22,8 @@ import android.view.View;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Objects;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -33,8 +32,8 @@ import ru.hse.colorshare.MainActivity;
 import ru.hse.colorshare.coding.encoding.DataFrameBulk;
 import ru.hse.colorshare.coding.encoding.EncodingController;
 import ru.hse.colorshare.coding.exceptions.EncodingException;
-import ru.hse.colorshare.communication.CommunicationProtocol;
-import ru.hse.colorshare.communication.Communicator;
+import ru.hse.colorshare.communication.ColorShareTransmitterCommunicator;
+import ru.hse.colorshare.communication.ReceiverMessage;
 
 @SuppressLint("Assert")
 public class TransmitterActivity extends AppCompatActivity {
@@ -48,7 +47,7 @@ public class TransmitterActivity extends AppCompatActivity {
     private static final int FRAMES_PER_BULK = 10; // constant for mock testing
     private static final String LOG_TAG = "ColorShare:transmitter";
 
-    private Communicator communicator;
+    private ColorShareTransmitterCommunicator communicator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,7 +76,7 @@ public class TransmitterActivity extends AppCompatActivity {
         enterFullscreenAndLockOrientation();
 
         assert checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
-        communicator = Communicator.getColorShareTransmitterSideCommunicator(this);
+        communicator = ColorShareTransmitterCommunicator.getInstance();
         setContentView(new DrawView(this));
     }
 
@@ -98,7 +97,7 @@ public class TransmitterActivity extends AppCompatActivity {
         super.onDestroy();
         try {
             if (communicator != null) {
-                communicator.close();
+                communicator.shutdown();
             }
             if (encodingController != null) {
                 encodingController.close();
@@ -172,7 +171,7 @@ public class TransmitterActivity extends AppCompatActivity {
             boolean retry = true;
             if (state.equals(TransmissionState.STARTED) || state.equals(TransmissionState.FINISHED)) {
                 assert drawThread != null && controllerThread != null && communicator != null;
-                communicator.stopWorking();
+                communicator.shutdown();
                 drawThreadStateLock.lock();
                 try {
                     drawThreadState = DrawThreadState.FINISH;
@@ -197,106 +196,102 @@ public class TransmitterActivity extends AppCompatActivity {
 
             @Override
             public void run() {
-                byte[] buffer = new byte[1000];
-                final long uniqueTransmitterKey = new Random().nextLong();
-                Log.d(LOG_TAG, "Unique transmitter key generated = " + uniqueTransmitterKey);
-                long start = System.currentTimeMillis();
-                long uniqueReceiverKey = runPairing(uniqueTransmitterKey, buffer);
-                long finish = System.currentTimeMillis();
-                long timeElapsed = finish - start;
-                Log.d(LOG_TAG, "Time pairing ms = " + timeElapsed + "; uniqueReceiverKey = " + uniqueReceiverKey);
-//                if (uniqueReceiverKey == -1) {
-//                    return;
-//                }
+
+                boolean pairingResult = runPairing();
+                if (!pairingResult) {
+                    return;
+                }
+
+                while (!isInterrupted()) {
+                    long[] bulkChecksums;
+                    int bulkIndex;
+                    drawThreadStateLock.lock();
+                    try {
+                        // get bulk
+                        currentBulk = encodingController.getNextBulk();
+                        bulkChecksums = currentBulk.getChecksums().clone();
+                        bulkIndex = encodingController.getBulkIndex();
+
+                        // check if transmission finished
+                        if (currentBulk == null) {
+                            Log.d(LOG_TAG, "Transmission successfully finished!");
+                            state = TransmissionState.FINISHED;
+                            communicator.sendTransmissionSuccessfullyFinishedMessage();
+                            setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
+                            finish();
+                            return;
+                        }
+
+                        // set bulk to drawThread
+                        Log.d(LOG_TAG, "Set current bulk: index #" + bulkIndex);
+                        if (!drawThreadState.equals(DrawThreadState.DRAW_BULK)) {
+                            drawThreadState = DrawThreadState.DRAW_BULK;
+                            Log.d(LOG_TAG, "Changed draw thread state to DRAW_BULK");
+                            drawThreadStateHasChanged.signal();
+                        } else {
+                            drawThread.interrupt(); // interrupt drawing previous bulk
+                        }
+
+                    } catch (EncodingException encodingException) {
+                        throw new RuntimeException("Encoding controller failed", encodingException);
+                    } finally {
+                        drawThreadStateLock.unlock();
+                    }
+
+                    boolean communicationResult = sendBulkInfoAndWaitForReceiverResponse(bulkIndex, bulkChecksums);
+                    if (!communicationResult) {
+                        return;
+                    }
+                }
             }
 
-            private long runPairing(long uniqueTransmitterKey, byte[] buffer) {
-                final long fileToSendSize = 100;
-                final int maxPairingAttempts = 100;
-                CommunicationProtocol.HelloMessage helloMessageToSend = CommunicationProtocol.HelloMessage.create(uniqueTransmitterKey, fileToSendSize);
-                Log.d(LOG_TAG, "Start pairing");
+            private boolean runPairing() {
+                Log.d(LOG_TAG, "Pairing started");
+                final int maxPairingAttempts = 10;
                 for (int i = 0; i < maxPairingAttempts; i++) {
                     Log.d(LOG_TAG, "Pairing attempt #" + i);
+                    communicator.sendPairingRequest();
                     try {
-                        final int blockingSendTimeout = 1;
-                        communicator.blockingSend(helloMessageToSend.toByteArray(), blockingSendTimeout);
-                    } catch (IOException ioException) {
-                        Log.d(LOG_TAG, "Blocking send of hello message attempt #" + i + " IOException: " + ioException.getMessage());
-                        continue;
-                    }
-                    Log.d(LOG_TAG, "Hello message attempt #" + i + " was successfully sent: " + helloMessageToSend);
-                    try {
-                        TimeUnit.SECONDS.sleep(1);
-                    } catch (InterruptedException ignored) {
-                    }
-                    //                    try {
-//                        TimeUnit.SECONDS.sleep(1);
-//                    } catch (InterruptedException ignored) {
-//                    }
-//                    final int blockingReceiveTimeout = 10;
-//                    CommunicationProtocol.HelloMessage receivedHelloMessage;
-//                    try {
-//                        int receivedBytes = communicator.blockingReceive(buffer, blockingReceiveTimeout);
-//                        receivedHelloMessage = CommunicationProtocol.HelloMessage.parseFromByteArray(buffer, receivedBytes);
-//                    } catch (IOException ioException) {
-//                        Log.d(LOG_TAG, "Blocking receive of hello message attempt #" + i + " IOException: " + ioException.getMessage());
-//                        continue;
-//                    }
-//                    assert receivedHelloMessage != null;
-//                    Log.d(LOG_TAG, "Hello message attempt #" + i + " was successfully received: " + receivedHelloMessage);
-//                    assert receivedHelloMessage.fileToSendSize == fileToSendSize;
-//                    Log.d(LOG_TAG, "Pairing succeed! Unique receiver key = " + receivedHelloMessage.uniqueTransmissionKey);
-//                    return receivedHelloMessage.uniqueTransmissionKey;
-                }
-                setResult(MainActivity.TransmissionResultCode.PAIRING_FAILED.value, new Intent());
-                finish();
-                return -1;
-            }
-
-            private boolean sendBulkInfoAndWaitForReceiverResponse(long uniqueTransmitterKey, long uniqueReceiverKey, int bulkIndex, long[] bulkChecksums, byte[] buffer) {
-                final int maxSendBulkInfoAttempts = 5;
-                final int blockingSendTimeout = 2;
-                final int blockingReceiveTimeout = 5;
-                CommunicationProtocol.TransmitterMessage bulkInfoMessage =
-                        CommunicationProtocol.TransmitterMessage.createInProgressMessage(
-                                uniqueTransmitterKey,
-                                bulkIndex,
-                                bulkChecksums,
-                                params);
-                Log.d(LOG_TAG, "Start sending bulk info message:\n" + bulkInfoMessage);
-                for (int i = 0; i < maxSendBulkInfoAttempts; i++) {
-                    try {
-                        communicator.blockingSend(bulkInfoMessage.toByteArray(), blockingSendTimeout);
-                    } catch (IOException ioException) {
-                        Log.d(LOG_TAG, "Blocking send of bulk info message IOException: " + ioException.getMessage());
-                        continue;
-                    }
-//                    try {
-//                        TimeUnit.MICROSECONDS.sleep(100);
-//                    }catch (InterruptedException ignored) {
-//                    }
-                    Log.d(LOG_TAG, "Bulk info message was successfully sent");
-                    try {
-                        CommunicationProtocol.ReceiverMessage receiverMessage = CommunicationProtocol.ReceiverMessage.parseFromByteArray(uniqueReceiverKey, buffer, communicator.blockingReceive(buffer, blockingReceiveTimeout));
-                        Log.d(LOG_TAG, "Received success-message from receiver: " + receiverMessage);
-                        if (receiverMessage == null) { // TODO:  skip messages with other key
-                            continue;
-                        }
-                        assert receiverMessage.bulkIndex == bulkIndex;
+                        long receiverId = communicator.waitForPairingRequest(6);
+                        communicator.bindPartnerId(receiverId);
+                        communicator.sendPairingSucceedMessage();
+                        Log.d(LOG_TAG, "Pairing succeed!");
                         return true;
-                    } catch (IOException ioException) {
-                        Log.d(LOG_TAG, "Blocking send of bulk info message IOException: " + ioException.getMessage());
+                    } catch (TimeoutException ignored) {
+                        Log.d(LOG_TAG, "Pairing attempt #" + i + " failed");
                     }
-//                    try {
-//                        TimeUnit.MICROSECONDS.sleep(100);
-//                    }catch (InterruptedException ignored) {
-//                    }
                 }
-                setResult(MainActivity.TransmissionResultCode.FAILED_TO_SEND_BULK.value, new Intent());
+                Log.d(LOG_TAG, "Pairing failed");
+                setResult(MainActivity.TransmissionResultCode.PAIRING_FAILED.value, new Intent());
                 finish();
                 return false;
             }
 
+            private boolean sendBulkInfoAndWaitForReceiverResponse(int bulkIndex, long[] bulkChecksums) {
+                final int maxSendBulkMessageAttempts = 10;
+                for (int i = 0; i < maxSendBulkMessageAttempts; i++) {
+                    communicator.sendBulkMessage(bulkIndex, bulkChecksums, params);
+                    try {
+                        ReceiverMessage message = communicator.waitForMessage(6);
+                        switch (message.getMessageType()) {
+                            case BULK_RECEIVED:
+                                Log.d(LOG_TAG, "Bulk #" + bulkIndex + " successfully sent");
+                                return true;
+
+                            case TRANSMISSION_CANCELED:
+                                Log.d(LOG_TAG, "Receiver canceled transmission");
+                                setResult(MainActivity.TransmissionResultCode.CANCELED.value, new Intent());
+                                finish();
+                                return false;
+                        }
+                    } catch (TimeoutException ignored) {
+                    }
+                }
+                Log.d(LOG_TAG, "Receiver is lost, finishing");
+                setResult(MainActivity.TransmissionResultCode.RECEIVER_LOST.value, new Intent());
+                finish();
+                return false;
+            }
         }
 
         private class DrawThread extends Thread {
@@ -409,7 +404,8 @@ public class TransmitterActivity extends AppCompatActivity {
             }
         }
 
-        @SuppressWarnings("RedundantCast")
+        /* currently mock */
+
         private TransmissionParams evaluateTransmissionParams() throws IllegalStateException {
             final Rect frameBounds = getHolder().getSurfaceFrame();
             int height = frameBounds.height() - 2 * TransmissionParams.BORDER_SIZE;

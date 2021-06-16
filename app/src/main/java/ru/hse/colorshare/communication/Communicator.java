@@ -1,27 +1,23 @@
 package ru.hse.colorshare.communication;
 
-import android.content.Context;
+import java.util.concurrent.TimeoutException;
 
-import androidx.annotation.NonNull;
+public interface Communicator {
 
-import java.io.Closeable;
-import java.io.IOException;
+    long getCommunicatorId();
 
-public interface Communicator extends Closeable {
-    static @NonNull
-    Communicator getColorShareTransmitterSideCommunicator(@NonNull Context context) {
-        return new SoundCommunicator(context, "audible-7k-channel-0", "audible-7k-channel-1");
-    }
+    void bindPartnerId(long partnerId);
 
-    static @NonNull
-    Communicator getColorShareReceiverSideCommunicator(@NonNull Context context) {
-        return new SoundCommunicator(context, "audible-7k-channel-1", "audible-7k-channel-0");
-    }
+    void shutdown();
 
-    void blockingSend(@NonNull byte[] toSendMessage, long blockingTimeoutInSeconds) throws IOException;
+    // pairing
 
-    // returns received message length in bytes
-    int blockingReceive(@NonNull byte[] receivedMessageBuffer, long blockingTimeoutInSeconds) throws IOException;
+    void sendPairingRequest();
 
-    void stopWorking();
+    long waitForPairingRequest(int timeoutSeconds) throws TimeoutException;
+
+    void sendPairingSucceedMessage();
+
+    void waitForPairingSucceedMessage(int timeoutSeconds) throws TimeoutException;
+
 }

@@ -153,8 +153,8 @@ public class MainActivity extends AppCompatActivity {
                     case PAIRING_FAILED:
                         Toast.makeText(getApplicationContext(), "File sending failed: transmitter and receiver pairing failed, try again", Toast.LENGTH_LONG).show();
                         break;
-                    case FAILED_TO_SEND_BULK:
-                        Toast.makeText(getApplicationContext(), "File sending failed: too many attempts to send one bulk, try again", Toast.LENGTH_LONG).show();
+                    case RECEIVER_LOST:
+                        Toast.makeText(getApplicationContext(), "File sending failed: receiver has been lost while transmission, try again", Toast.LENGTH_LONG).show();
                         break;
                 }
                 break;
@@ -210,7 +210,7 @@ public class MainActivity extends AppCompatActivity {
         FAILED_TO_READ_FILE(5),
         FAILED_TO_GET_TRANSMISSION_PARAMS(6),
         PAIRING_FAILED(7),
-        FAILED_TO_SEND_BULK(8);
+        RECEIVER_LOST(8);
 
         public final int value;
         private static final Map<Integer, TransmissionResultCode> map = new HashMap<>();
