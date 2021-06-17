@@ -89,7 +89,7 @@ public class CameraService {
             if (size.getWidth() > 2000) {
                 continue; // too large sizes decrease fps
             }
-            double maxTheoreticalFps = 1e9 / config.getOutputMinFrameDuration(previewView.getSurfaceTexture().getClass(), size);
+            double maxTheoreticalFps = 1e9 / config.getOutputMinFrameDuration(SurfaceTexture.class, size);
             double sizeEvaluation = size.getHeight() * size.getWidth() * maxTheoreticalFps;
             if (result == null || resultSizeEvaluation < sizeEvaluation) {
                 result = size;

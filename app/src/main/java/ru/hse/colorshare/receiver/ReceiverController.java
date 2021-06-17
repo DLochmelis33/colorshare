@@ -53,7 +53,7 @@ public class ReceiverController {
     public static volatile int currentBulk = -1;
     private final Thread mainReceiverThread;
 
-    public ReceiverController(ReceiverCameraActivity callerActivity, Thread.UncaughtExceptionHandler exceptionHandler) {
+    public ReceiverController(ReceiverCameraActivity callerActivity, Thread.UncaughtExceptionHandler exceptionHandler) throws FileNotFoundException {
         Thread.UncaughtExceptionHandler receiverExceptionHandler = new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(@NonNull Thread t, @NonNull Throwable e) {
@@ -80,17 +80,7 @@ public class ReceiverController {
         contentTempFileUri = FileProvider.getUriForFile(callerActivity.getApplicationContext(), BuildConfig.APPLICATION_ID + ".fileprovider", tempFile);
         Log.d(TAG, contentTempFileUri.toString());
 
-        // ! write trash data so that file is not empty => exists
-//        try {
-//            ParcelFileDescriptor pfd = callerActivity.getContentResolver().openFileDescriptor(contentTempFileUri, "w");
-//            FileOutputStream fileOutputStream = new FileOutputStream(pfd.getFileDescriptor());
-//            fileOutputStream.write(5);
-//            // Let the document provider know you're done by closing the stream.
-//            fileOutputStream.close();
-//            pfd.close();
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
+        decodingController = DecodingController.create(contentTempFileUri, callerActivity.getApplicationContext());
 
         // trick to register callback before activity starts
         onFileCreateResultRunnable = this::onFileCreateResult;
@@ -115,13 +105,8 @@ public class ReceiverController {
             // flush decoder to file (executor)
             // break if read all bulks
 
-            // ! debug:
-            isWorking.set(false);
-            isSuccess.set(true);
-            if (true) break;
-
             // ! hardcode:
-            long[] checksums = new long[]{5, 5, 5};
+            long[] checksums = new long[]{1555076429, 1154175259};
             decodingController.startNewBulkEncoding(checksums);
             currentBulk = 5;
             try {

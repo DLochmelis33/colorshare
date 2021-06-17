@@ -24,6 +24,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Comparator;
 
@@ -155,7 +156,11 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             }
         });
 
-        receiverController = new ReceiverController(this, exceptionHandler);
+        try {
+            receiverController = new ReceiverController(this, exceptionHandler);
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
