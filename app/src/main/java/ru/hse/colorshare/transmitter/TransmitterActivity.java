@@ -20,6 +20,7 @@ import android.view.View;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 import ru.hse.colorshare.MainActivity;
@@ -253,6 +254,7 @@ public class TransmitterActivity extends AppCompatActivity {
                     }
                     Log.d(LOG_TAG, "Bulk # " + encodingController.getBulkIndex() + " is ready to be sent");
                     Log.d(LOG_TAG, "Encoding controller info: " + encodingController.getInfo());
+                    Log.d(LOG_TAG, Arrays.toString(bulk.getChecksums()));
                     while (true) { // bulk cycle // TODO: add timeout?
                         try {
                             int[] colors = bulk.getNextDataFrame();

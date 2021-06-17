@@ -69,18 +69,16 @@ public class ColorExtractor {
     private final static int PREV_CENTER_CHECKING_EPS = 10;
     private final static int PREV_CENTER_UNIT_EPS = 3;
 
-    private final static double CHECKING_EPS_COEF_UNIT = 3; // ~3 => searching area ~ expected locator
+    //    private final static double CHECKING_EPS_COEF_UNIT = 3; // ~3 => searching area ~ expected locator
     private final static int CHECKING_EPS_LIMIT = 70;
 
     // how many units fit into entire (!) image height
-    // min can actually be quite large: if locators are big, just move the camera away bc you don't need precision
-    private final static int MAX_UNITS_IN_HEIGHT = 100;
-    private final static int MIN_UNITS_IN_HEIGHT = 20;
+    // min can actually be quite large: if locators are big, just move the camera away - you don't need precision
+    private final static int MAX_UNITS_IN_HEIGHT = 150;
+    private final static int MIN_UNITS_IN_HEIGHT = 17;
 
-    //    private final static int X_SKIP = 5;
-//    private final static int Y_SKIP = 5;
-    private final static int UNIT_SKIP = 1;
-    private final static double XY_SKIP_UNIT_COEF = 0.3;
+    private final static int UNIT_SKIP = 2;
+    private final static double XY_SKIP_UNIT_COEF = 0.8;
 
     // while UR hint is UR corner of a locator mark, DL hint is a DL corner
     public enum HintPos {
@@ -160,7 +158,7 @@ public class ColorExtractor {
                     tcy = hint.y - (int) (2.5 * unit);
                     break;
             }
-            final int checkingEps = round(Math.min(unit * CHECKING_EPS_COEF_UNIT, CHECKING_EPS_LIMIT));
+            final int checkingEps = CHECKING_EPS_LIMIT;
             final int skip = round(unit * XY_SKIP_UNIT_COEF);
             for (int x = Math.max(0, tcx - checkingEps); x < Math.min(img.getWidth(), tcx + checkingEps); x += skip) {
                 for (int y = Math.max(0, tcy - checkingEps); y < Math.min(img.getHeight(), tcy + checkingEps); y += skip) {
@@ -231,11 +229,11 @@ public class ColorExtractor {
     }
 
     private static double average(double... values) {
-        double sum = 0;
+        int sum = 0;
         for (double x : values) {
             sum += x;
         }
-        return sum / values.length;
+        return (double) sum / values.length;
     }
 
     private static Point average(Point... points) {
@@ -244,7 +242,7 @@ public class ColorExtractor {
             sumx += p.x;
             sumy += p.y;
         }
-        return new Point(round(1.0 * sumx / points.length), round(1.0 * sumy / points.length));
+        return new Point(round((double) sumx / points.length), round((double) sumy / points.length));
     }
 
     private static double distance(Point p1, Point p2) {
@@ -283,11 +281,29 @@ public class ColorExtractor {
 
     }
 
-    // found out that threads actually interfere with each other and break sometimes
+    // wrap lastResult variable so that it is not usable directly
+    private static class LastResult {
+        private volatile static LocatorResult[] lastResult;
+        private volatile static long lastResultTime = 0;
+        private static final long LAST_RESULT_TIMEOUT = 1000;
 
-    private volatile static LocatorResult[] lastResult; // different threads make this 'null' when unnecessary
+        private static void update(@NonNull LocatorResult[] newResult) {
+            lastResult = newResult;
+            lastResultTime = System.currentTimeMillis();
+        }
 
-    @Nullable
+        @Nullable
+        private static LocatorResult[] get() {
+            if (lastResult != null && System.currentTimeMillis() - lastResultTime > LAST_RESULT_TIMEOUT) {
+                lastResult = null;
+            }
+            return lastResult;
+        }
+
+    }
+
+    //    @Nullable
+    @NonNull
     public static LocatorResult[] findLocators(Bitmap img, RelativePoint[] hints) {
         if (BuildConfig.DEBUG && hints.length != 4) {
             throw new AssertionError("hints.length == " + hints.length + " != 4");
@@ -296,17 +312,17 @@ public class ColorExtractor {
         LocatorResult[] results = new LocatorResult[4];
         for (int i = 0; i < 4; i++) {
             Point hint = new Point((int) (wrapper.getWidth() * hints[i].x), (int) (wrapper.getHeight() * hints[i].y));
-            if (lastResult != null) {
+            LocatorResult[] lastResult = LastResult.get();
+            if (lastResult != null && lastResult[i] != null) {
                 results[i] = findLocator(wrapper, hint, HintPos.fromIndex(i), new Point(lastResult[i].x, lastResult[i].y), lastResult[i].unit);
             } else {
                 results[i] = findLocator(wrapper, hint, HintPos.fromIndex(i));
             }
-            if (results[i] == null) {
-                lastResult = null;
-                return null;
-            }
+//            if (results[i] == null) {
+//                return null;
+//            }
         }
-        lastResult = results;
+        LastResult.update(results);
         return results;
     }
 
@@ -347,7 +363,7 @@ public class ColorExtractor {
         for (int value : values) {
             sum += value;
         }
-        int avgRounded = round(sum / 4.0);
+        int avgRounded = round((double) sum / values.length);
         if (Math.abs(sum - avgRounded * values.length) > 1) {
             return -1;
         }
@@ -421,16 +437,15 @@ public class ColorExtractor {
     }
 
     @Nullable
-    public static ArrayList<Integer> extractColors(Bitmap img, RelativePoint[] hints) {
-        return extractColors(img, hints, -1, -1);
-    }
-
-    @Nullable
-    public static ArrayList<Integer> extractColors(Bitmap img, RelativePoint[] hints, int gridWidth, int gridHeight) {
-        LocatorResult[] locators = findLocators(img, hints);
-        if (locators == null) {
-            return null;
+    public static ArrayList<Integer> extractColorsFromResult(Bitmap img, @NonNull LocatorResult[] locators, int gridWidth, int gridHeight) {
+        for (LocatorResult lr : locators) {
+            if (lr == null) {
+                return null;
+            }
         }
+//        if (locators == null) {
+//            return null;
+//        }
         double avgUnit = 0;
         for (int i = 0; i < 4; i++) {
             avgUnit += locators[i].unit;
@@ -456,8 +471,18 @@ public class ColorExtractor {
                 gridCornerUL, gridCornerUR, gridCornerDR, gridCornerDL,
                 gridWidth, gridHeight
         );
-
         return extractFromGrid(img, gridMapper, avgUnit);
+    }
+
+    @Nullable
+    public static ArrayList<Integer> extractColors(Bitmap img, RelativePoint[] hints) {
+        return extractColors(img, hints, -1, -1);
+    }
+
+    @Nullable
+    public static ArrayList<Integer> extractColors(Bitmap img, RelativePoint[] hints, int gridWidth, int gridHeight) {
+        LocatorResult[] locators = findLocators(img, hints);
+        return extractColorsFromResult(img, locators, gridWidth, gridHeight);
     }
 
     private static ArrayList<Integer> extractFromGrid(Bitmap img, GridMapper gridMapper, double avgUnit) {

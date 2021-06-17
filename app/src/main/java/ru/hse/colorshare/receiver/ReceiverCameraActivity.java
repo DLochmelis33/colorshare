@@ -2,7 +2,9 @@ package ru.hse.colorshare.receiver;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
@@ -14,42 +16,75 @@ import android.os.Message;
 import android.util.Log;
 import android.util.Size;
 import android.view.TextureView;
-import android.view.View;
-import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Comparator;
 
 import ru.hse.colorshare.BuildConfig;
 import ru.hse.colorshare.R;
-import ru.hse.colorshare.receiver.util.RelativePoint;
+import ru.hse.colorshare.receiver.util.CameraException;
 
 public class ReceiverCameraActivity extends AppCompatActivity {
 
     private static final String TAG = "ReceiverCameraActivity";
 
     private CameraService cameraService;
-    private TextView dummyTextView;
     private FrameOverlayView frameOverlayView;
+    private ActivityResultLauncher<Intent> fileCreateResultLauncher;
+    private ReceiverController receiverController;
 
     public Handler getReceivingStatusHandler() {
         return receivingStatusHandler;
     }
 
     private Handler receivingStatusHandler;
+    private final Thread.UncaughtExceptionHandler exceptionHandler = new Thread.UncaughtExceptionHandler() {
+        @Override
+        public void uncaughtException(@NonNull Thread t, @NonNull Throwable e) {
+            // TODO: status
+            Log.e(TAG, Log.getStackTraceString(e));
+            String toastMessage = "Sorry, something went wrong.";
+            if (e instanceof CameraException) {
+                toastMessage = "Sorry, something went wrong with the camera.";
+            }
+            // ! for some reason doesn't show; probably bc of Context being destroyed with the activity?
+            Toast.makeText(ReceiverCameraActivity.this.getApplicationContext(), toastMessage, Toast.LENGTH_LONG).show();
+            ReceiverCameraActivity.this.finish();
+        }
+    };
 
     private static final int cameraPermissionRequestCode = 55555; // !
 
+    public void callFileCreate() {
+        Intent intent = new ActivityResultContracts.CreateDocument().createIntent(getApplicationContext(), null);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        fileCreateResultLauncher.launch(intent);
+    }
+
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        fileCreateResultLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                ReceiverController.onFileCreateCallback
+        );
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, cameraPermissionRequestCode);
         } else {
-            init(savedInstanceState);
+            init();
         }
     }
 
@@ -58,7 +93,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == cameraPermissionRequestCode) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                init(null);
+                init();
             } else {
                 Toast.makeText(this, "Camera permission is required, please grant it.", Toast.LENGTH_LONG).show();
                 this.finish();
@@ -66,8 +101,9 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         }
     }
 
-    private void init(Bundle savedInstanceState) {
+    private void init() {
         setContentView(R.layout.activity_reciever_camera);
+        Thread.currentThread().setUncaughtExceptionHandler(exceptionHandler);
 
         // android-style assert
         if (BuildConfig.DEBUG && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -79,35 +115,16 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         cameraTextureView.setOverlayView(frameOverlayView);
         frameOverlayView.setUnderlyingView(cameraTextureView);
 
-        dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
-        cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView);
-
-        View statusBar = findViewById(R.id.readingStatusBar);
-        View statusLayout = findViewById(R.id.statusCoordinatorLayout);
-        
-        // didn't help:
-//        statusLayout.forceLayout();
-//        statusBar.forceLayout();
-//        dummyTextView.forceLayout();
-
-//        findViewById(R.id.ConstraintLayout).invalidate();
-//        statusLayout.invalidate();
-//        statusBar.invalidate();
-//        dummyTextView.invalidate();
+//        TextView dummyTextView = findViewById(R.id.dummyReadingStatusTextView);
+        cameraService = new CameraService((CameraManager) getSystemService(Context.CAMERA_SERVICE), this, cameraTextureView, exceptionHandler);
 
         receivingStatusHandler = new Handler(Looper.myLooper()) {
             @Override
             public void handleMessage(Message msg) {
-                String s = String.valueOf(msg.obj);
-                dummyTextView.setText(s);
-                if (!s.equals("null")) {
-                    Log.d(TAG, s);
-                }
-                // drawing in this thread is too slow
+                // TODO: more info
+                frameOverlayView.setExtras((Bitmap) msg.obj);
             }
         };
-
-        ImageProcessor.getInstance().setContext(getApplicationContext());
 
         String cameraId = chooseCamera();
         if (cameraId == null) {
@@ -118,6 +135,9 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             @Override
             public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
                 cameraService.tryOpenCamera(cameraId);
+                receiverController.start();
+                // ! debug
+//                ImageProcessor.getInstance().setGridSize(30, 50);
             }
 
             @Override
@@ -136,30 +156,21 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             }
         });
 
+        try {
+            receiverController = new ReceiverController(this, exceptionHandler);
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
         cameraService.closeCamera();
-//        ImageProcessor.getInstance().EXECUTOR.shutdownNow();
+        ImageProcessor.getInstance().shutdown();
     }
 
-    public RelativePoint[] getHints() {
-        return frameOverlayView.getCornersHints();
-    }
-
-    // returns a camera that 1) is not monochrome 2) is of largest sensor area
+    // returns a camera that 1) faces backwards and is not monochrome 2) is of largest sensor area
     private String chooseCamera() {
         try {
             String bestCameraId = null;

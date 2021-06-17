@@ -15,6 +15,8 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
@@ -27,10 +29,10 @@ import androidx.core.app.ActivityCompat;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 
 import ru.hse.colorshare.BuildConfig;
+import ru.hse.colorshare.receiver.util.CameraException;
+import ru.hse.colorshare.receiver.util.SlidingAverage;
 
 public class CameraService {
 
@@ -40,22 +42,27 @@ public class CameraService {
     private CameraDevice cameraDevice;
     private String cameraId;
     private CaptureRequest.Builder captureRequestBuilder;
-    public static final int IMAGE_FORMAT = ImageFormat.YUV_420_888;
+    public static final int IMAGE_FORMAT = ImageFormat.JPEG;
 
     private final ReceiverCameraActivity startingActivity;
-    private final TextureView previewView;
+    private final CameraOverlaidView previewView;
     private ImageReader imageReader;
 
-    private long lastFrameTime = 0;
-    private long frameTimeSum = 0;
-    private int frameCount = 0;
+    private Handler backgroundHandler;
+    private HandlerThread backgroundThread;
+    private final Thread.UncaughtExceptionHandler exceptionHandler;
 
-    public CameraService(CameraManager manager, ReceiverCameraActivity startingActivity, TextureView previewView) {
+    private long lastFrameTime = 0;
+    private final int fpsWindowSize = 50;
+    private final SlidingAverage fpsCounter = new SlidingAverage(fpsWindowSize);
+
+    public CameraService(CameraManager manager, ReceiverCameraActivity startingActivity, CameraOverlaidView previewView, Thread.UncaughtExceptionHandler exceptionHandler) {
         this.manager = manager;
         this.cameraDevice = null;
         cameraId = null;
         this.previewView = previewView;
         this.startingActivity = startingActivity;
+        this.exceptionHandler = exceptionHandler;
     }
 
     public void tryOpenCamera(String cameraId) {
@@ -65,10 +72,10 @@ public class CameraService {
                 throw new IllegalStateException("was camera permission revoked?");
             }
             this.cameraId = cameraId;
-            manager.openCamera(cameraId, cameraStateCallback, null); // !
+            startBackgroundThread();
+            manager.openCamera(cameraId, cameraStateCallback, null /* will modify UI in this thread */);
         } catch (CameraAccessException e) {
-            e.printStackTrace();
-            throw new RuntimeException("couldn't open camera " + cameraId);
+            throw new CameraException("couldn't open camera " + cameraId, e);
         }
     }
 
@@ -79,7 +86,10 @@ public class CameraService {
         assert sizes != null;
         Log.d(TAG, Arrays.toString(sizes));
         for (Size size : sizes) {
-            double maxTheoreticalFps = 1e9 / config.getOutputMinFrameDuration(previewView.getSurfaceTexture().getClass(), size);
+            if (size.getWidth() > 2000) {
+                continue; // too large sizes decrease fps
+            }
+            double maxTheoreticalFps = 1e9 / config.getOutputMinFrameDuration(SurfaceTexture.class, size);
             double sizeEvaluation = size.getHeight() * size.getWidth() * maxTheoreticalFps;
             if (result == null || resultSizeEvaluation < sizeEvaluation) {
                 result = size;
@@ -88,39 +98,6 @@ public class CameraService {
         }
         assert result != null; // ! studio told to
         Log.d(TAG, "maxthroughput size: " + result.getWidth() + "x" + result.getHeight() + " with eval=" + resultSizeEvaluation);
-        return result;
-    }
-
-    /* modified googlearchive way to choose size
-     *
-     * ---------------- DO NOT TOUCH ----------------
-     */
-    private Size chooseOptimalSizeMod(Size[] choices, int textureViewWidth,
-                                      int textureViewHeight, Size aspectRatio) {
-        Size result;
-
-        // Collect the supported resolutions that are at least as big as the preview Surface
-        List<Size> bigEnough = new ArrayList<>();
-        // Collect the supported resolutions that are smaller than the preview Surface
-        List<Size> notBigEnough = new ArrayList<>();
-        int w = aspectRatio.getWidth();
-        int h = aspectRatio.getHeight();
-        for (Size option : choices) {
-            if (option.getHeight() * w == option.getWidth() * h) {
-                if (option.getWidth() >= textureViewWidth && option.getHeight() >= textureViewHeight) {
-                    bigEnough.add(option);
-                } else {
-                    notBigEnough.add(option);
-                }
-            }
-        }
-        if (bigEnough.size() > 0) {
-            result = Collections.min(bigEnough, (s1, s2) -> s1.getWidth() * s1.getHeight() - s2.getWidth() * s2.getHeight());
-        } else if (notBigEnough.size() > 0) {
-            result = Collections.max(notBigEnough, (s1, s2) -> s1.getWidth() * s1.getHeight() - s2.getWidth() * s2.getHeight());
-        } else {
-            throw new IllegalStateException("couldn't find any suitable preview size");
-        }
         return result;
     }
 
@@ -138,47 +115,53 @@ public class CameraService {
                     throw new IllegalStateException("camera cannot output to SurfaceTexture");
                 }
 
+                Log.d(TAG, "available sizes: " + Arrays.toString(configurations.getOutputSizes(SurfaceTexture.class)));
+
                 // choose size of output surface
-                Size preferredSize = chooseOptimalSizeMod(configurations.getOutputSizes(SurfaceTexture.class),
-                        previewView.getWidth(), previewView.getHeight(),
-                        calculateMaxThroughputSize(configurations));
-//                Size preferredSize = calculateMaxThroughputSize(configurations); // ! DO NOT
-//                preferredSize = new Size(1280, 720); // magic numbers
+                Size preferredSize = calculateMaxThroughputSize(configurations);
+//                Size preferredSize = new Size(256, 144); // ! debug
 
-                int sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-                Log.d(TAG, "sensor orientation = " + sensorOrientation);
-                if (sensorOrientation == 90 || sensorOrientation == 270) {
-                    // swap dimensions
-                    preferredSize = new Size(preferredSize.getHeight(), preferredSize.getWidth());
-                }
+                // ----- THIS IS CURSED -----
+//                int sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+//                Log.w(TAG, "sensor orientation = " + sensorOrientation);
+//                if (sensorOrientation == 90 || sensorOrientation == 270) {
+//                    // swap dimensions
+//                    preferredSize = new Size(preferredSize.getHeight(), preferredSize.getWidth());
+//                }
+
                 Log.d(TAG, "chosen size = " + preferredSize);
-                resizePreviewViewToRatio(preferredSize);
 
+                resizePreviewViewToRatio(new Size(preferredSize.getHeight(), preferredSize.getWidth())); // ! ! !
+                previewView.forceLayout();
                 imageReader = ImageReader.newInstance(preferredSize.getWidth(), preferredSize.getHeight(), IMAGE_FORMAT, 2); // 2 is minimum required for acquireLatestImage
+
+                SurfaceTexture previewSurfaceTexture = previewView.getSurfaceTexture();
+                // ! order ?
+                Surface previewSurface = new Surface(previewSurfaceTexture);
+                previewSurfaceTexture.setDefaultBufferSize(preferredSize.getWidth(), preferredSize.getHeight());
 
                 // create CaptureRequest
                 captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD); // record vs preview?
-//                captureRequestBuilder.set(CaptureRequest.JPEG_QUALITY, (byte) 97); // !
-//                captureRequestBuilder.set(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_OFF); // disable some post-processing related to edges of objects
-                captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
-                captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_STATE_ACTIVE_SCAN); // might be better than AF_MODE_CONTINUOUS_PICTURE
-
-                Surface previewSurface = new Surface(previewView.getSurfaceTexture());
-                previewView.getSurfaceTexture().setDefaultBufferSize(preferredSize.getWidth(), preferredSize.getHeight());
-
                 ArrayList<Surface> surfacesList = new ArrayList<>();
                 surfacesList.add(previewSurface);
                 captureRequestBuilder.addTarget(previewSurface);
                 surfacesList.add(imageReader.getSurface());
                 captureRequestBuilder.addTarget(imageReader.getSurface());
 
+//                captureRequestBuilder.set(CaptureRequest.JPEG_QUALITY, (byte) 97); // !
+//                captureRequestBuilder.set(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_OFF); // disable some post-processing related to edges of objects
+                captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
+                captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE); // ! maybe AF_STATE_ACTIVE_SCAN ?
+
+//                captureRequestBuilder.set(CaptureRequest.JPEG_ORIENTATION, sensorOrientation);
+
                 // submit a capture request by creating a session
                 // deprecated (api 30), but no other option (api 23)
-                cameraDevice.createCaptureSession(surfacesList, stateCallback, null);
+                cameraDevice.createCaptureSession(surfacesList, stateCallback, backgroundHandler);
 
             } catch (CameraAccessException e) {
                 e.printStackTrace();
-                throw new RuntimeException("camera access exception");
+                throw new CameraException("camera access exception", e);
             }
         }
 
@@ -190,7 +173,7 @@ public class CameraService {
 
         @Override
         public void onError(@NonNull CameraDevice camera, int error) {
-            throw new RuntimeException("camera error, code " + error);
+            throw new CameraException("camera error, code " + error);
         }
     };
 
@@ -210,9 +193,15 @@ public class CameraService {
                             return;
                         }
 
+//                        Runtime runtime = Runtime.getRuntime();
+//                        long availHeapSize = runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory());
+//                        if (availHeapSize <= 16 * 1024 * 1024) { // on my phone one image is around 4MB
+//                            return;
+//                        }
+
                         Image image = imageReader.acquireLatestImage();
                         if (image == null) {
-//                            Log.v(TAG, "null image");
+                            Log.v(TAG, "null image");
                             return;
                         }
                         if (BuildConfig.DEBUG && image.getFormat() != IMAGE_FORMAT) {
@@ -226,18 +215,16 @@ public class CameraService {
 //                        }
 
                         // copy image data and close image
-                        ByteBuffer yBuffer = image.getPlanes()[0].getBuffer();
-                        ByteBuffer vuBuffer = image.getPlanes()[2].getBuffer();
+                        ByteBuffer imgBuffer = image.getPlanes()[0].getBuffer();
                         int width = image.getWidth();
                         int height = image.getHeight();
-                        int ySize = yBuffer.remaining();
-                        int vuSize = vuBuffer.remaining();
-                        byte[] nv21 = new byte[ySize + vuSize]; // ! ?
-                        yBuffer.get(nv21, 0, ySize);
-                        vuBuffer.get(nv21, ySize, vuSize);
+                        int bytesSize = imgBuffer.remaining();
+                        byte[] imgBytes = new byte[bytesSize];
+                        imgBuffer.get(imgBytes, 0, bytesSize);
                         image.close(); // ASAP
 
-                        ImageProcessor.process(new ImageProcessor.Task(nv21, width, height, startingActivity.getHints(), startingActivity.getReceivingStatusHandler()));
+                        ImageProcessor.process(new ImageProcessor.Task(imgBytes, width, height, previewView.getOverlayView().getCornersHints(),
+                                startingActivity.getReceivingStatusHandler(), startingActivity.getApplicationContext()));
 
                         if (lastFrameTime == 0) {
                             lastFrameTime = System.currentTimeMillis();
@@ -245,33 +232,34 @@ public class CameraService {
                         }
                         long newFrameTime = System.currentTimeMillis();
                         long delta = newFrameTime - lastFrameTime;
-                        frameTimeSum += delta;
-                        frameCount++;
-                        Log.d("FPS", String.valueOf(1.0 * frameTimeSum / frameCount));
                         lastFrameTime = newFrameTime;
+                        fpsCounter.addValue(delta);
+
+                        Log.v("FPS", String.valueOf(1000.0 * fpsWindowSize / fpsCounter.getSum()));
                     }
 
                     @Override
                     public void onCaptureSequenceCompleted(@NonNull CameraCaptureSession session, int sequenceId, long frameNumber) {
                         super.onCaptureSequenceCompleted(session, sequenceId, frameNumber);
                     }
-                }, null);
+                }, backgroundHandler);
 
             } catch (CameraAccessException e) {
-                e.printStackTrace();
-                throw new RuntimeException();
+                throw new CameraException(e);
             }
         }
 
         @Override
         public void onConfigureFailed(CameraCaptureSession session) {
-            throw new IllegalStateException("camera configuring failed");
+            throw new CameraException("camera configuring failed");
         }
     };
+
 
     public void resizePreviewViewToRatio(Size size) {
         int w = previewView.getWidth();
         int h = previewView.getHeight();
+        Log.w(TAG, "resizing: w was " + w + ", h was " + h);
         double scaleByWidth = (double) w / size.getWidth();
         double scaleByHeight = (double) h / size.getHeight();
         if (scaleByWidth * size.getHeight() <= h) {
@@ -281,6 +269,7 @@ public class CameraService {
         } else {
             throw new AssertionError("unscalable size?");
         }
+        Log.w(TAG, "resizing: w new " + previewView.getWidth() + ", h new " + previewView.getHeight());
     }
 
     public void closeCamera() {
@@ -292,6 +281,29 @@ public class CameraService {
         if (imageReader != null) {
             imageReader.close();
             imageReader = null;
+        }
+        if (backgroundHandler != null && backgroundThread != null) {
+            stopBackgroundThread();
+        }
+    }
+
+
+    private void startBackgroundThread() {
+        backgroundThread = new HandlerThread("CameraBackground");
+        backgroundThread.setUncaughtExceptionHandler(exceptionHandler);
+        backgroundThread.start();
+        backgroundHandler = new Handler(backgroundThread.getLooper());
+    }
+
+    private void stopBackgroundThread() {
+        backgroundThread.quitSafely();
+        try {
+            backgroundThread.join();
+            backgroundThread = null;
+            backgroundHandler = null;
+        } catch (InterruptedException e) {
+            // ignore
+            e.printStackTrace();
         }
     }
 

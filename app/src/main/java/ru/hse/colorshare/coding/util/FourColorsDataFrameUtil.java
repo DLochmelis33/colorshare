@@ -24,6 +24,7 @@ public class FourColorsDataFrameUtil {
     public static final int UNITS_PER_BYTE = Byte.SIZE / BITS_PER_UNIT;
 
     public static final Map<Integer, Integer> FROM_BITS = new HashMap<>();
+    public static final Map<Integer, Integer> FROM_COLORS = new HashMap<>();
 
     public static final List<FourColorUnit> ALL_TWO_BIT_UNITS = Arrays.asList(
             new FourColorUnit(Color.BLUE, 0b00),
@@ -36,15 +37,7 @@ public class FourColorsDataFrameUtil {
     static {
         for (FourColorUnit unit : ALL_TWO_BIT_UNITS) {
             FROM_BITS.put(unit.encodedValue, unit.color);
+            FROM_COLORS.put(unit.color, unit.encodedValue);
         }
-    }
-
-    public static void writeByteAsColors(int[] colors, int offset, byte toEncode) {
-
-    }
-
-    // TODO
-    public static byte readColorsAsByte(int[] colors, int offset) {
-        return 0;
     }
 }
