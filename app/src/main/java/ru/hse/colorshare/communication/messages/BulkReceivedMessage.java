@@ -1,10 +1,12 @@
 package ru.hse.colorshare.communication.messages;
 
+import java.nio.ByteBuffer;
+
 import ru.hse.colorshare.communication.Message;
 
 public class BulkReceivedMessage extends Message {
 
-    protected BulkReceivedMessage() {
+    public BulkReceivedMessage() {
         super(MessageType.BULK_RECEIVED);
     }
 
@@ -13,7 +15,7 @@ public class BulkReceivedMessage extends Message {
         return new byte[0];
     }
 
-    public static Message parseDerivedFrom(byte[] byteArray) {
+    public static Message parseDerivedFrom(ByteBuffer byteBuffer) {
         return new BulkReceivedMessage();
     }
 }

@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 import ru.hse.colorshare.communication.messages.BulkMessage;
 import ru.hse.colorshare.communication.messages.BulkReceivedMessage;
+import ru.hse.colorshare.communication.messages.PairingMessage;
 import ru.hse.colorshare.communication.messages.TransmissionCanceledMessage;
 import ru.hse.colorshare.communication.messages.TransmissionFinishedMessage;
 
@@ -51,17 +52,20 @@ public abstract class Message {
         MessageType messageType = MessageType.values()[byteBuffer.getInt()];
         Message parsedMessage;
         switch (messageType) {
+            case PAIRING:
+                parsedMessage = PairingMessage.parseDerivedFrom(byteBuffer);
+                break;
             case BULK:
-                parsedMessage = BulkMessage.parseDerivedFrom(byteBuffer.array());
+                parsedMessage = BulkMessage.parseDerivedFrom(byteBuffer);
                 break;
             case BULK_RECEIVED:
-                parsedMessage = BulkReceivedMessage.parseDerivedFrom(byteBuffer.array());
+                parsedMessage = BulkReceivedMessage.parseDerivedFrom(byteBuffer);
                 break;
             case TRANSMISSION_FINISHED:
-                parsedMessage = TransmissionFinishedMessage.parseDerivedFrom(byteBuffer.array());
+                parsedMessage = TransmissionFinishedMessage.parseDerivedFrom(byteBuffer);
                 break;
             case TRANSMISSION_CANCELED:
-                parsedMessage = TransmissionCanceledMessage.parseDerivedFrom(byteBuffer.array());
+                parsedMessage = TransmissionCanceledMessage.parseDerivedFrom(byteBuffer);
                 break;
             default:
                 throw new IllegalStateException("Unexpected value: " + messageType);
@@ -77,6 +81,7 @@ public abstract class Message {
     }
 
     public enum MessageType {
+        PAIRING,
         BULK,
         BULK_RECEIVED,
         TRANSMISSION_FINISHED,

@@ -4,10 +4,10 @@ import java.nio.ByteBuffer;
 
 import ru.hse.colorshare.communication.Message;
 
-public class TransmissionFinishedMessage extends Message {
+public class PairingMessage extends Message {
 
-    public TransmissionFinishedMessage() {
-        super(MessageType.TRANSMISSION_FINISHED);
+    public PairingMessage() {
+        super(MessageType.PAIRING);
     }
 
     @Override
@@ -16,6 +16,6 @@ public class TransmissionFinishedMessage extends Message {
     }
 
     public static Message parseDerivedFrom(ByteBuffer byteBuffer) {
-        return new TransmissionFinishedMessage();
+        return new PairingMessage();
     }
 }

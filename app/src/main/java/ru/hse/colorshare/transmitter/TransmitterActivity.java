@@ -1,13 +1,12 @@
 package ru.hse.colorshare.transmitter;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
-import android.content.pm.PackageManager;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -23,7 +22,6 @@ import android.view.View;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -32,8 +30,12 @@ import ru.hse.colorshare.MainActivity;
 import ru.hse.colorshare.coding.encoding.DataFrameBulk;
 import ru.hse.colorshare.coding.encoding.EncodingController;
 import ru.hse.colorshare.coding.exceptions.EncodingException;
-import ru.hse.colorshare.communication.ColorShareTransmitterCommunicator;
-import ru.hse.colorshare.communication.messages.ReceiverMessage;
+import ru.hse.colorshare.communication.ByTurnsCommunicator;
+import ru.hse.colorshare.communication.ConnectionLostException;
+import ru.hse.colorshare.communication.Message;
+import ru.hse.colorshare.communication.messages.BulkMessage;
+import ru.hse.colorshare.communication.messages.PairingMessage;
+import ru.hse.colorshare.communication.messages.TransmissionFinishedMessage;
 
 @SuppressLint("Assert")
 public class TransmitterActivity extends AppCompatActivity {
@@ -47,7 +49,7 @@ public class TransmitterActivity extends AppCompatActivity {
     private static final int FRAMES_PER_BULK = 10; // constant for mock testing
     private static final String LOG_TAG = "ColorShare:transmitter";
 
-    private ColorShareTransmitterCommunicator communicator;
+    private ByTurnsCommunicator communicator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,8 +77,7 @@ public class TransmitterActivity extends AppCompatActivity {
                 });
         enterFullscreenAndLockOrientation();
 
-        assert checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
-        communicator = ColorShareTransmitterCommunicator.getInstance();
+        communicator = ByTurnsCommunicator.getInstance(this);
         setContentView(new DrawView(this));
     }
 
@@ -104,6 +105,16 @@ public class TransmitterActivity extends AppCompatActivity {
             }
         } catch (IOException ioException) {
             throw new RuntimeException("Transmission file failed to close", ioException);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (!communicator.checkPermissionsAreGranted(requestCode, grantResults)) {
+            setResult(MainActivity.TransmissionResultCode.FAILED_TO_GET_RECORD_AUDIO_PERMISSION.ordinal(), new Intent());
+            finish();
         }
     }
 
@@ -199,6 +210,8 @@ public class TransmitterActivity extends AppCompatActivity {
 
                 boolean pairingResult = runPairing();
                 if (!pairingResult) {
+                    setResult(MainActivity.TransmissionResultCode.PAIRING_FAILED.ordinal(), new Intent());
+                    finish();
                     return;
                 }
 
@@ -216,7 +229,14 @@ public class TransmitterActivity extends AppCompatActivity {
                         if (currentBulk == null) {
                             Log.d(LOG_TAG, "Transmission successfully finished!");
                             state = TransmissionState.FINISHED;
-                            communicator.sendTransmissionSuccessfullyFinishedMessage();
+                            communicator.send(new TransmissionFinishedMessage());
+                            try {
+                                Message message = communicator.receive();
+                                assert message.getMessageType().equals(Message.MessageType.TRANSMISSION_FINISHED);
+                                Log.d(LOG_TAG, "Receiver finish response received!");
+                            } catch (ConnectionLostException connectionLostException) {
+                                Log.d(LOG_TAG, "Didn't receive finish response from receiver");
+                            }
                             setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
                             finish();
                             return;
@@ -238,8 +258,14 @@ public class TransmitterActivity extends AppCompatActivity {
                         drawThreadStateLock.unlock();
                     }
 
-                    boolean communicationResult = sendBulkInfoAndWaitForReceiverResponse(bulkIndex, bulkChecksums);
-                    if (!communicationResult) {
+                    communicator.send(new BulkMessage(bulkChecksums, params.rows, params.cols));
+                    try {
+                        Message message = communicator.receive();
+                        assert message.getMessageType().equals(Message.MessageType.BULK_RECEIVED);
+                    } catch (ConnectionLostException connectionLostException) {
+                        Log.d(LOG_TAG, "Connection lost while waiting for bulk ok: " + connectionLostException.getMessage());
+                        setResult(MainActivity.TransmissionResultCode.RECEIVER_LOST.ordinal(), new Intent());
+                        finish();
                         return;
                     }
                 }
@@ -247,50 +273,16 @@ public class TransmitterActivity extends AppCompatActivity {
 
             private boolean runPairing() {
                 Log.d(LOG_TAG, "Pairing started");
-                final int maxPairingAttempts = 10;
-                for (int i = 0; i < maxPairingAttempts; i++) {
-                    Log.d(LOG_TAG, "Pairing attempt #" + i);
-                    communicator.sendPairingRequest();
-                    try {
-                        long receiverId = communicator.waitForPairingRequest(6);
-                        communicator.bindPartnerId(receiverId);
-                        communicator.sendPairingSucceedMessage();
-                        Log.d(LOG_TAG, "Pairing succeed!");
-                        return true;
-                    } catch (TimeoutException ignored) {
-                        Log.d(LOG_TAG, "Pairing attempt #" + i + " failed");
-                    }
+                communicator.send(new PairingMessage());
+                try {
+                    Message message = communicator.receive();
+                    assert message.getMessageType().equals(Message.MessageType.PAIRING);
+                    communicator.bindPartner(message.getSenderId());
+                    return true;
+                } catch (ConnectionLostException connectionLostException) {
+                    Log.d(LOG_TAG, "Pairing failed: " + connectionLostException.getMessage());
+                    return false;
                 }
-                Log.d(LOG_TAG, "Pairing failed");
-                setResult(MainActivity.TransmissionResultCode.PAIRING_FAILED.value, new Intent());
-                finish();
-                return false;
-            }
-
-            private boolean sendBulkInfoAndWaitForReceiverResponse(int bulkIndex, long[] bulkChecksums) {
-                final int maxSendBulkMessageAttempts = 10;
-                for (int i = 0; i < maxSendBulkMessageAttempts; i++) {
-                    communicator.sendBulkMessage(bulkIndex, bulkChecksums, params);
-                    try {
-                        ReceiverMessage message = communicator.waitForMessage(6);
-                        switch (message.getMessageType()) {
-                            case BULK_RECEIVED:
-                                Log.d(LOG_TAG, "Bulk #" + bulkIndex + " successfully sent");
-                                return true;
-
-                            case TRANSMISSION_CANCELED:
-                                Log.d(LOG_TAG, "Receiver canceled transmission");
-                                setResult(MainActivity.TransmissionResultCode.CANCELED.value, new Intent());
-                                finish();
-                                return false;
-                        }
-                    } catch (TimeoutException ignored) {
-                    }
-                }
-                Log.d(LOG_TAG, "Receiver is lost, finishing");
-                setResult(MainActivity.TransmissionResultCode.RECEIVER_LOST.value, new Intent());
-                finish();
-                return false;
             }
         }
 

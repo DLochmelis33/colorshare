@@ -43,27 +43,6 @@ public class MainActivity extends AppCompatActivity {
 
         fileToSendTextView = findViewById(R.id.fileToSendTextView);
         fileToSendInfo.name = getResources().getString(R.string.default_file_to_send_message);
-
-        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, RequestCode.RECORD_AUDIO_PERMISSION.ordinal());
-    }
-
-    @SuppressWarnings("SwitchStatementWithTooFewBranches")
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        switch (RequestCode.values()[requestCode]) {
-            case RECORD_AUDIO_PERMISSION: {
-                if (!(grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                    setResult(MainActivity.TransmissionResultCode.FAILED_TO_GET_RECORD_AUDIO_PERMISSION.value, new Intent());
-                    finish();
-                }
-                break;
-            }
-            default:
-                throw new IllegalStateException("illegal permission request code");
-        }
     }
 
     public void onClickSelectFile(View view) {

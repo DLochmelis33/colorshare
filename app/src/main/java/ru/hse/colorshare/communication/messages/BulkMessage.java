@@ -41,8 +41,7 @@ public class BulkMessage extends Message {
         return byteBuffer.array();
     }
 
-    public static Message parseDerivedFrom(byte[] byteArray) {
-        ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray, 0, byteArray.length);
+    public static Message parseDerivedFrom(ByteBuffer byteBuffer) {
         int gridRows = byteBuffer.getInt();
         int gridCols = byteBuffer.getInt();
         List<Long> checksumsList = new ArrayList<>();

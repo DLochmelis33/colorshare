@@ -17,6 +17,7 @@ public interface ByTurnsCommunicator {
         return new SoniTalkByTurnCommunicator(activity);
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     boolean checkPermissionsAreGranted(int requestCode, @NonNull int[] grantResults);
     // must be called at onRequestPermissionsResult
 

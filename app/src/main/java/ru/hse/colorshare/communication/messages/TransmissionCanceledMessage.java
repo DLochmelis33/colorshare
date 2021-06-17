@@ -1,10 +1,12 @@
 package ru.hse.colorshare.communication.messages;
 
+import java.nio.ByteBuffer;
+
 import ru.hse.colorshare.communication.Message;
 
 public class TransmissionCanceledMessage extends Message {
 
-    protected TransmissionCanceledMessage() {
+    public TransmissionCanceledMessage() {
         super(MessageType.TRANSMISSION_CANCELED);
     }
 
@@ -12,7 +14,7 @@ public class TransmissionCanceledMessage extends Message {
         return new byte[0];
     }
 
-    public static Message parseDerivedFrom(byte[] byteArray) {
+    public static Message parseDerivedFrom(ByteBuffer byteBuffer) {
         return new TransmissionCanceledMessage();
     }
 }
