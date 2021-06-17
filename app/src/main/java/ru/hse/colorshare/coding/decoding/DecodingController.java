@@ -6,6 +6,7 @@ import android.net.Uri;
 import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.OutputStream;
 
 import ru.hse.colorshare.coding.decoding.impl.SimpleDecodingController;
 import ru.hse.colorshare.coding.exceptions.DecodingException;
@@ -13,7 +14,11 @@ import ru.hse.colorshare.coding.exceptions.DecodingException;
 public interface DecodingController extends Closeable {
 
     static DecodingController create(Uri filename, Context context) throws FileNotFoundException {
-        return new SimpleDecodingController(context.getContentResolver().openOutputStream(filename));
+        return create(context.getContentResolver().openOutputStream(filename));
+    }
+
+    static DecodingController create(OutputStream stream) {
+        return new SimpleDecodingController(stream);
     }
 
     void startNewBulkEncoding(long[] checksums);

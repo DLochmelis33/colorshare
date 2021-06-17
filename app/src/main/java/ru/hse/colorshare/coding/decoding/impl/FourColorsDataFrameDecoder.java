@@ -17,7 +17,7 @@ public class FourColorsDataFrameDecoder implements ColorDataFrameDecoder {
 
     public FourColorsDataFrameDecoder(Checksum checksum) {
         this.checksum = checksum;
-        this.chooser = new FourColorManhattanMetricsColorChooser();
+        this.chooser = new FourColorsMetricsBasedColorChooser(new EuclidMetrics());
     }
 
     private byte readColorsAsByte(int[] colors, int offset) {
