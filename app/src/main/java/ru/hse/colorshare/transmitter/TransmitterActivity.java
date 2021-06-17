@@ -33,7 +33,7 @@ import ru.hse.colorshare.coding.encoding.DataFrameBulk;
 import ru.hse.colorshare.coding.encoding.EncodingController;
 import ru.hse.colorshare.coding.exceptions.EncodingException;
 import ru.hse.colorshare.communication.ColorShareTransmitterCommunicator;
-import ru.hse.colorshare.communication.ReceiverMessage;
+import ru.hse.colorshare.communication.messages.ReceiverMessage;
 
 @SuppressLint("Assert")
 public class TransmitterActivity extends AppCompatActivity {

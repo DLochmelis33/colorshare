@@ -4,20 +4,16 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import ru.hse.colorshare.MainActivity;
 import ru.hse.colorshare.R;
+import ru.hse.colorshare.communication.messages.BulkMessage;
 
 public class MockReceiverActivity extends AppCompatActivity {
 
@@ -51,7 +47,7 @@ public class MockReceiverActivity extends AppCompatActivity {
         Log.d(LOG_TAG, "Attempt to receive bulk and send OK");
 
         try {
-            TransmitterMessage message = communicator.waitForMessage(60);
+            BulkMessage message = communicator.waitForMessage(60);
             Log.d(LOG_TAG, "Transmitter message received!");
             switch (message.getMessageType()) {
                 case BULK_INFO:
