@@ -1,10 +1,12 @@
 package ru.hse.colorshare.coding.decoding.impl;
 
+import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.zip.Checksum;
 
 import ru.hse.colorshare.coding.decoding.ByteDataFrame;
 import ru.hse.colorshare.coding.decoding.ColorDataFrameDecoder;
+import ru.hse.colorshare.coding.util.FourColorsDataFrameUtil;
 
 import static ru.hse.colorshare.coding.util.FourColorsDataFrameUtil.BITS_PER_UNIT;
 import static ru.hse.colorshare.coding.util.FourColorsDataFrameUtil.FROM_COLORS;
@@ -35,14 +37,20 @@ public class FourColorsDataFrameDecoder implements ColorDataFrameDecoder {
         if (colors.length % UNITS_PER_BYTE != 0)
             throw new IllegalArgumentException("Illegal data frame colors");
 
-        byte[] decodedBytes = new byte[colors.length / UNITS_PER_BYTE];
+        ByteBuffer decodedBytes = ByteBuffer.allocate(colors.length / UNITS_PER_BYTE);
         int currentDecoded = 0;
         for (int inArray = 0; inArray + UNITS_PER_BYTE < colors.length; inArray += UNITS_PER_BYTE, currentDecoded++) {
-            decodedBytes[currentDecoded] = readColorsAsByte(colors, inArray);
+            if (chooser.chooseClosest(colors[inArray]) == FourColorsDataFrameUtil.EMPTY_COLOR) {
+                break;
+            }
+            decodedBytes.put(readColorsAsByte(colors, inArray));
         }
+        byte[] bytes = new byte[decodedBytes.limit()];
+        decodedBytes.flip();
+        decodedBytes.get(bytes);
         checksum.reset();
-        checksum.update(decodedBytes, 0, decodedBytes.length);
-        return new SimpleByteDataFrame(decodedBytes, checksum.getValue());
+        checksum.update(bytes, 0, bytes.length);
+        return new SimpleByteDataFrame(bytes, checksum.getValue());
     }
 
     @Override

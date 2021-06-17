@@ -1,6 +1,8 @@
 package ru.hse.colorshare.coding.decoding.impl;
 
 
+import ru.hse.colorshare.coding.util.FourColorsDataFrameUtil;
+
 import static ru.hse.colorshare.coding.util.FourColorsDataFrameUtil.ALL_TWO_BIT_UNITS;
 
 public class FourColorsMetricsBasedColorChooser implements OptimalColorChooser {
@@ -21,6 +23,9 @@ public class FourColorsMetricsBasedColorChooser implements OptimalColorChooser {
                 currentOptimalIndex = i;
                 currentOptimalDistance = currentDistance;
             }
+        }
+        if (metrics.distance(color, FourColorsDataFrameUtil.EMPTY_COLOR) < currentOptimalDistance) {
+            return FourColorsDataFrameUtil.EMPTY_COLOR;
         }
         return ALL_TWO_BIT_UNITS.get(currentOptimalIndex).color;
     }
