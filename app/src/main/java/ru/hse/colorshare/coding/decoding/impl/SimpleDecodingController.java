@@ -1,5 +1,7 @@
 package ru.hse.colorshare.coding.decoding.impl;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
@@ -16,6 +18,8 @@ import ru.hse.colorshare.coding.decoding.DecodingController;
 import ru.hse.colorshare.coding.decoding.DecodingPostprocessor;
 
 public class SimpleDecodingController implements DecodingController {
+
+    private static final String TAG = "SmplDecodingController";
 
     private final Map<Long, Integer> checksumToIndex = new HashMap<>();
     private final AtomicInteger receivedFramesCount = new AtomicInteger(0);
@@ -61,10 +65,14 @@ public class SimpleDecodingController implements DecodingController {
     public void testFrame(int[] colors) {
         ByteDataFrame dataFrame = decoder.decode(colors);
         Integer assumedIndex = checksumToIndex.get(dataFrame.getChecksum());
+        if(assumedIndex == null) {
+            Log.w(TAG, "unknown checksum: " + dataFrame.getChecksum());
+        }
         if (assumedIndex != null && receivedBytes[assumedIndex] != null) {
             receivedBytes[assumedIndex] = dataFrame.getBytes();
             receivedFramesCount.incrementAndGet();
             receivedFramesLatch.countDown();
+            Log.d(TAG, "decoded frame #" + assumedIndex);
         }
     }
 

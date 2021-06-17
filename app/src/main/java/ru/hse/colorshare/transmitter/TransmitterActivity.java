@@ -341,7 +341,7 @@ public class TransmitterActivity extends AppCompatActivity {
             private boolean waitForReceiverResponse() {
                 // currently is mock
                 try {
-                    wait(TimeUnit.SECONDS.toMillis(1));
+                    wait(TimeUnit.SECONDS.toMillis(5));
                 } catch (InterruptedException exc) {
                     return false;
                 }

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.os.Handler;
 import android.os.Message;
@@ -12,6 +13,8 @@ import android.renderscript.RenderScript;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -40,7 +43,7 @@ public class ImageProcessor {
         private final RelativePoint[] hints;
         private final long creationTime;
         private final Context context;
-        private final int bulkOnCreation;
+        private final ReceiverController.BulkParams bulkOnCreation;
 
         public Task(byte[] imageBytes, int width, int height, RelativePoint[] hints, Handler resultHandler, Context context) {
             this.imageBytes = imageBytes;
@@ -68,7 +71,7 @@ public class ImageProcessor {
 
         @Override
         public void run() {
-            if (bulkOnCreation == -1) {
+            if (bulkOnCreation.index == -1) {
                 Log.v(TAG, "no bulk");
                 return;
             }
@@ -126,15 +129,25 @@ public class ImageProcessor {
 //                extrasCanvas.drawCircle((float) (rp.x * width), (float) (rp.y * height), 30, hp);
 //            }
 
-            ArrayList<Integer> colors = ColorExtractor.extractColorsFromResult(bitmap, locators, getInstance().gridWidth, getInstance().gridHeight);
+            ArrayList<Integer> colors = ColorExtractor.extractColorsFromResult(bitmap, locators, bulkOnCreation.gridWidth, bulkOnCreation.gridHeight);
             if (colors != null) {
+                // apparently no built-in method for this
                 int[] colorArray = new int[colors.size()];
+                StringBuilder colorlog = new StringBuilder();
+                for (int i = 0; i < colorArray.length; i++) {
+                    colorArray[i] = colors.get(i);
+                    colorlog.append("{");
+                    colorlog.append(convnum(Color.red(colorArray[i]))).append("/");
+                    colorlog.append(convnum(Color.green(colorArray[i]))).append("/");
+                    colorlog.append(convnum(Color.blue(colorArray[i]))).append("}, ");
+                }
+                Log.d(TAG, colorlog.substring(colorlog.length() - 200));
                 ReceiverController.decodingController.testFrame(colorArray);
 //                if (isOutdated("colors checked")) {
 //                    return;
 //                }
             } else {
-                Log.w(TAG, "no colors");
+                Log.v(TAG, "no colors");
             }
 
 //            // TODO
@@ -146,6 +159,11 @@ public class ImageProcessor {
             Log.v(TAG, "avg working ms = " + getInstance().taskTimeCounter.getAverage());
         }
 
+    }
+
+    private static String convnum(int c) {
+        String convertNumberAsString = String.valueOf(c);
+        return "000".substring(convertNumberAsString.length()) + convertNumberAsString;
     }
 
     private ImageProcessor() {
@@ -178,14 +196,6 @@ public class ImageProcessor {
     }
 
     private final SlidingAverage taskTimeCounter = new SlidingAverage(10);
-
-    private volatile int gridWidth = -1;
-    private volatile int gridHeight = -1;
-
-    public void setGridSize(int gridWidth, int gridHeight) {
-        this.gridWidth = gridWidth;
-        this.gridHeight = gridHeight;
-    }
 
 // ----------- image processing methods below -----------
 

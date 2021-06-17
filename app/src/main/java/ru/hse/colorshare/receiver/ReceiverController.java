@@ -27,13 +27,31 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.zip.CRC32;
 
 import ru.hse.colorshare.BuildConfig;
 import ru.hse.colorshare.coding.decoding.DecodingController;
+import ru.hse.colorshare.coding.decoding.impl.FourColorsDataFrameDecoder;
+import ru.hse.colorshare.coding.encoding.impl.FourColorsDataFrameEncoder;
 
 import static androidx.core.content.FileProvider.getUriForFile;
 
 public class ReceiverController {
+
+    public static class BulkParams {
+        public final int index;
+        public final int gridWidth, gridHeight;
+
+        public BulkParams(int index, int gridWidth, int gridHeight) {
+            this.index = index;
+            this.gridWidth = gridWidth;
+            this.gridHeight = gridHeight;
+        }
+
+        public static BulkParams empty() {
+            return new BulkParams(-1, -1, -1);
+        }
+    }
 
     private static final String TAG = "ReceiverController";
 
@@ -41,7 +59,7 @@ public class ReceiverController {
     private static Uri contentTempFileUri;
 
     private static final TimeUnit timeUnit = TimeUnit.MILLISECONDS;
-    private static final long TIMEOUT_BULK_PROCESSING = 5000;
+    private static final long TIMEOUT_BULK_PROCESSING = 5_000_000_000L; // ! debug
 
     private final ReceiverCameraActivity callerActivity;
     private final ExecutorService fileWriterExecutor;
@@ -50,7 +68,7 @@ public class ReceiverController {
 
     public static DecodingController decodingController;
     private final String receivedFileName = "image-55555.jpg"; // ! hardcoded
-    public static volatile int currentBulk = -1;
+    public static volatile BulkParams currentBulk = BulkParams.empty();
     private final Thread mainReceiverThread;
 
     public ReceiverController(ReceiverCameraActivity callerActivity, Thread.UncaughtExceptionHandler exceptionHandler) throws FileNotFoundException {
@@ -106,9 +124,9 @@ public class ReceiverController {
             // break if read all bulks
 
             // ! hardcode:
-            long[] checksums = new long[]{1555076429, 1154175259};
+            long[] checksums = new long[]{2223856481L, 3482625459L, 2349862L, 2260314162L, 993643526L};
             decodingController.startNewBulkEncoding(checksums);
-            currentBulk = 5;
+            currentBulk = new BulkParams(5, 22, 40);
             try {
                 decodingController.awaitBulkFullyEncoded(TIMEOUT_BULK_PROCESSING, timeUnit);
             } catch (InterruptedException e) {
