@@ -2,30 +2,34 @@ package ru.hse.colorshare.receiver;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.util.Size;
 import android.view.TextureView;
-import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.io.IOException;
 import java.util.Comparator;
 
 import ru.hse.colorshare.BuildConfig;
 import ru.hse.colorshare.R;
 import ru.hse.colorshare.receiver.util.CameraException;
-import ru.hse.colorshare.receiver.util.RelativePoint;
 
 public class ReceiverCameraActivity extends AppCompatActivity {
 
@@ -33,6 +37,8 @@ public class ReceiverCameraActivity extends AppCompatActivity {
 
     private CameraService cameraService;
     private FrameOverlayView frameOverlayView;
+    private ActivityResultLauncher<Intent> fileCreateResultLauncher;
+    private ReceiverController receiverController;
 
     public Handler getReceivingStatusHandler() {
         return receivingStatusHandler;
@@ -43,7 +49,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
         @Override
         public void uncaughtException(@NonNull Thread t, @NonNull Throwable e) {
             // TODO: status
-            Log.e(TAG, e.getMessage());
+            Log.e(TAG, Log.getStackTraceString(e));
             String toastMessage = "Sorry, something went wrong.";
             if (e instanceof CameraException) {
                 toastMessage = "Sorry, something went wrong with the camera.";
@@ -55,6 +61,21 @@ public class ReceiverCameraActivity extends AppCompatActivity {
     };
 
     private static final int cameraPermissionRequestCode = 55555; // !
+
+    public void callFileCreate() {
+        Intent intent = new ActivityResultContracts.CreateDocument().createIntent(getApplicationContext(), null);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        fileCreateResultLauncher.launch(intent);
+    }
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        fileCreateResultLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                ReceiverController.onFileCreateCallback
+        );
+    }
 
     @Override
     protected void onResume() {
@@ -113,7 +134,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             @Override
             public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
                 cameraService.tryOpenCamera(cameraId);
-
+                receiverController.start();
                 // ! debug
 //                ImageProcessor.getInstance().setGridSize(30, 50);
             }
@@ -134,6 +155,7 @@ public class ReceiverCameraActivity extends AppCompatActivity {
             }
         });
 
+        receiverController = new ReceiverController(this, exceptionHandler);
     }
 
     @Override

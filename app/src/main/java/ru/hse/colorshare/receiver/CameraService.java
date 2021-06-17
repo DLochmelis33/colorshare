@@ -86,7 +86,7 @@ public class CameraService {
         assert sizes != null;
         Log.d(TAG, Arrays.toString(sizes));
         for (Size size : sizes) {
-            if (size.getWidth() > 1000) {
+            if (size.getWidth() > 2000) {
                 continue; // too large sizes decrease fps
             }
             double maxTheoreticalFps = 1e9 / config.getOutputMinFrameDuration(previewView.getSurfaceTexture().getClass(), size);

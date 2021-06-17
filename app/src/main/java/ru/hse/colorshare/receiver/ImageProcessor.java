@@ -40,6 +40,7 @@ public class ImageProcessor {
         private final RelativePoint[] hints;
         private final long creationTime;
         private final Context context;
+        private final int bulkOnCreation;
 
         public Task(byte[] imageBytes, int width, int height, RelativePoint[] hints, Handler resultHandler, Context context) {
             this.imageBytes = imageBytes;
@@ -50,6 +51,7 @@ public class ImageProcessor {
             this.context = context;
             this.TAG = "TASK" + (cnt.incrementAndGet());
             creationTime = System.currentTimeMillis();
+            bulkOnCreation = ReceiverController.currentBulk;
         }
 
         // call after any long operation
@@ -58,11 +60,22 @@ public class ImageProcessor {
                 Log.w(TAG, "outdated after having " + msg);
                 return true;
             }
+            if (bulkOnCreation != ReceiverController.currentBulk) {
+                Log.w(TAG, "outdated bulk");
+            }
             return false;
         }
 
         @Override
         public void run() {
+            if (bulkOnCreation == -1) {
+                Log.v(TAG, "no bulk");
+                return;
+            }
+            if (isOutdated("started")) {
+                return;
+            }
+
             long startTime = System.currentTimeMillis();
             Log.v(TAG, "ms elapsed before start: " + (startTime - creationTime));
             if (startTime - creationTime > TIMEOUT) {
@@ -115,19 +128,11 @@ public class ImageProcessor {
 
             ArrayList<Integer> colors = ColorExtractor.extractColorsFromResult(bitmap, locators, getInstance().gridWidth, getInstance().gridHeight);
             if (colors != null) {
-                // ! debug
-//                boolean correct = true;
-//                for (int i = 0; i < colors.size(); i++) {
-//                    correct = ((i % 2 == 0) == ColorExtractor.BitmapBinaryWrapper.roundColorBW(colors.get(i)));
-//                    if (!correct) {
-//                        break;
-//                    }
+                int[] colorArray = new int[colors.size()];
+                ReceiverController.decodingController.testFrame(colorArray);
+//                if (isOutdated("colors checked")) {
+//                    return;
 //                }
-//                Log.d(TAG, "success=" + correct);
-
-                if (isOutdated("colors checked")) {
-                    return;
-                }
             } else {
                 Log.w(TAG, "no colors");
             }
