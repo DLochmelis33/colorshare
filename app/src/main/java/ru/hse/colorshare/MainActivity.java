@@ -22,6 +22,7 @@ import android.widget.Toast;
 import java.util.HashMap;
 import java.util.Map;
 
+import ru.hse.colorshare.receiver.ReceiverCameraActivity;
 import ru.hse.colorshare.transmitter.TransmitterActivity;
 
 public class MainActivity extends AppCompatActivity {
@@ -60,13 +61,16 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(getApplicationContext(), "Select a file", Toast.LENGTH_SHORT).show();
             return;
         }
+        Log.d(LOG_TAG, "Start TransmitterActivity");
         Intent intent = new Intent(this, TransmitterActivity.class);
         intent.putExtra("fileToSendUri", fileToSendInfo.uri);
         startActivityForResult(intent, RequestCode.TRANSMIT_FILE.ordinal());
     }
 
-    public void onClickTest(View view) {
-        Toast.makeText(getApplicationContext(), "Test", Toast.LENGTH_SHORT).show();
+    public void onClickReceive(View view) {
+        Log.d(LOG_TAG, "Start ReceiverCameraActivity");
+        Intent intent = new Intent(this, ReceiverCameraActivity.class);
+        startActivityForResult(intent, RequestCode.RECEIVE_FILE.ordinal());
     }
 
     @Override
@@ -122,6 +126,13 @@ public class MainActivity extends AppCompatActivity {
                         Toast.makeText(getApplicationContext(), "File sending failed: bad device params", Toast.LENGTH_LONG).show();
                         break;
                 }
+                break;
+            case RECEIVE_FILE:
+                if (resultCodeValue != RESULT_OK) {
+                    return;
+                }
+                Toast.makeText(getApplicationContext(), "File was successfully received!", Toast.LENGTH_LONG).show();
+                break;
         }
         super.onActivityResult(requestCodeValue, resultCodeValue, resultData);
     }
@@ -156,7 +167,8 @@ public class MainActivity extends AppCompatActivity {
 
     private enum RequestCode {
         PICK_FILE,
-        TRANSMIT_FILE
+        TRANSMIT_FILE,
+        RECEIVE_FILE
     }
 
     public enum TransmissionResultCode {

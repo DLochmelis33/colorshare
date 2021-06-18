@@ -1,9 +1,13 @@
 package ru.hse.colorshare.coding.decoding.impl;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.CRC32;
@@ -15,8 +19,11 @@ import ru.hse.colorshare.coding.decoding.DecodingPostprocessor;
 
 public class SimpleDecodingController implements DecodingController {
 
+    private static final String TAG = "SmplDecodingController";
+
     private final Map<Long, Integer> checksumToIndex = new HashMap<>();
     private final AtomicInteger receivedFramesCount = new AtomicInteger(0);
+    private CountDownLatch receivedFramesLatch;
     private final AtomicBoolean flushed = new AtomicBoolean(false);
     private byte[][] receivedBytes;
 
@@ -41,6 +48,7 @@ public class SimpleDecodingController implements DecodingController {
         for (int i = 0; i < checksums.length; i++) {
             checksumToIndex.put(checksums[i], i);
         }
+        receivedFramesLatch = new CountDownLatch(checksums.length);
     }
 
     @Override
@@ -49,12 +57,22 @@ public class SimpleDecodingController implements DecodingController {
     }
 
     @Override
+    public void awaitBulkFullyEncoded(long timeout, TimeUnit unit) throws InterruptedException {
+        receivedFramesLatch.await(timeout, unit);
+    }
+
+    @Override
     public void testFrame(int[] colors) {
         ByteDataFrame dataFrame = decoder.decode(colors);
         Integer assumedIndex = checksumToIndex.get(dataFrame.getChecksum());
+        if(assumedIndex == null) {
+            Log.w(TAG, "unknown checksum: " + dataFrame.getChecksum());
+        }
         if (assumedIndex != null && receivedBytes[assumedIndex] != null) {
-            receivedFramesCount.incrementAndGet();
             receivedBytes[assumedIndex] = dataFrame.getBytes();
+            receivedFramesCount.incrementAndGet();
+            receivedFramesLatch.countDown();
+            Log.d(TAG, "decoded frame #" + assumedIndex);
         }
     }
 

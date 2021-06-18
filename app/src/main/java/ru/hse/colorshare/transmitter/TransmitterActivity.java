@@ -20,6 +20,7 @@ import android.view.View;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 import ru.hse.colorshare.MainActivity;
@@ -32,10 +33,11 @@ public class TransmitterActivity extends AppCompatActivity {
 
     private TransmissionState state;
     private TransmissionParams params;
-    private EncodingController controller;
+    private EncodingController encodingController;
 
     private int screenOrientation;
 
+    private static final int FRAMES_PER_BULK = 10; // constant for mock testing
     private static final String LOG_TAG = "ColorShare:transmitter";
 
     @Override
@@ -52,7 +54,7 @@ public class TransmitterActivity extends AppCompatActivity {
         }
 
         try {
-            controller = EncodingController.create(fileToSendUri, this);
+            encodingController = EncodingController.create(fileToSendUri, this);
         } catch (FileNotFoundException exc) {
             setResult(MainActivity.TransmissionResultCode.FAILED_TO_READ_FILE.value, new Intent());
             finish();
@@ -88,19 +90,19 @@ public class TransmitterActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-       /* try {
-            if (generatorFactory != null) {
-                // generatorFactory.finish();
+        try {
+            if (encodingController != null) {
+                encodingController.close();
             }
         } catch (IOException exc) {
             throw new RuntimeException("Transmission file failed to close", exc);
         }
-        */
     }
 
     private class DrawView extends SurfaceView implements SurfaceHolder.Callback {
 
         private DrawThread drawThread;
+        private int sentFrames = 0; // need only for mock testing
 
         public DrawView(Context context) {
             super(context);
@@ -117,7 +119,7 @@ public class TransmitterActivity extends AppCompatActivity {
         public void surfaceCreated(SurfaceHolder holder) {
             Log.d(LOG_TAG, "DrawView created, transmission state = " + state);
             setRequestedOrientation(screenOrientation);
-            assert !state.equals(TransmissionState.CREATING) && controller != null;
+            assert !state.equals(TransmissionState.CREATING) && encodingController != null;
 
             // cancel because of params loss
             // TODO: support restoring = save TransmitterActivity fields via ViewModel
@@ -138,7 +140,7 @@ public class TransmitterActivity extends AppCompatActivity {
                 finish();
                 return;
             }
-            controller.setTransmissionParameters(params);
+            encodingController.setTransmissionParameters(params.getColorFrameSize(), FRAMES_PER_BULK);
             assert params != null;
             Log.d(LOG_TAG, "Transmissions params: " + params.toString());
 
@@ -212,7 +214,7 @@ public class TransmitterActivity extends AppCompatActivity {
 
         private boolean testReceiverAbilityToRead(int unitSize) {
             // TODO: add test messaging with receiver
-            return unitSize >= 40; // mock for now
+            return unitSize >= 47; // mock for now
         }
 
         private class DrawThread extends Thread {
@@ -239,72 +241,80 @@ public class TransmitterActivity extends AppCompatActivity {
                     canvas = null;
                     DataFrameBulk bulk;
                     try {
-                        bulk  = controller.getNextBulk();
-                    } catch (EncodingException e) {
-                        throw new RuntimeException("Controller failed");
+                        bulk = encodingController.getNextBulk();
+                    } catch (EncodingException encodingException) {
+                        throw new RuntimeException("Encoding controller failed", encodingException);
                     }
-                    Log.d(LOG_TAG, "Generator info: " + controller.getInfo());
-                    try {
-                        int[] colors = bulk.getNextDataFrame();
-                        if (colors == null) {
-                            state = TransmissionState.FINISHED;
-                            Log.d(LOG_TAG, "Transmission successfully finished!");
-                            setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
-                            finish();
-                            return;
-                        }
-                        canvas = surfaceHolder.lockCanvas(null);
-                        if (canvas == null)
-                            continue;
-                        canvas.drawColor(Color.BLACK);
-                        canvas.translate(params.leftTopOfGrid.x, params.leftTopOfGrid.y);
-                        canvas.save();
-
-                        int locatorMarkSize = LocatorMarkGraphic.SIDE_SIZE_IN_UNITS;
-                        int unitSize = params.unitSize;
-
-                        // top stripe
-                        LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_TOP, unitSize);
-                        canvas.save();
-                        canvas.translate(locatorMarkSize * unitSize, 0);
-                        int stripeWidth = params.cols - 2 * locatorMarkSize; // in units
-                        int index = drawColorUnitsStripe(canvas, colors, 0, locatorMarkSize, stripeWidth);
-                        canvas.translate(stripeWidth * unitSize, 0);
-                        LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.RIGHT_TOP, unitSize);
-                        canvas.restore();
-
-                        // mid stripe
-                        canvas.translate(0, locatorMarkSize * unitSize);
-                        int stripeHeight = params.rows - 2 * locatorMarkSize;
-                        index = drawColorUnitsStripe(canvas, colors, index, stripeHeight, params.cols);
-
-                        // bottom stripe
-                        canvas.translate(0, stripeHeight * unitSize);
-                        LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_BOTTOM, unitSize);
-                        canvas.translate(locatorMarkSize * unitSize, 0);
-                        drawColorUnitsStripe(canvas, colors, index, locatorMarkSize, params.cols - locatorMarkSize);
-
-                        canvas.restore();
-                    } finally {
-                        if (canvas != null) {
-                            surfaceHolder.unlockCanvasAndPost(canvas);
-                        }
+                    if (bulk == null) {
+                        state = TransmissionState.FINISHED;
+                        Log.d(LOG_TAG, "Transmission successfully finished!");
+                        setResult(MainActivity.TransmissionResultCode.SUCCEED.value, new Intent());
+                        finish();
+                        return;
                     }
-                    boolean response;
-                    synchronized (this) {
-                        if (!running) {
-                            break;
+                    Log.d(LOG_TAG, "Bulk # " + encodingController.getBulkIndex() + " is ready to be sent");
+                    Log.d(LOG_TAG, "Encoding controller info: " + encodingController.getInfo());
+                    Log.d(LOG_TAG, Arrays.toString(bulk.getChecksums()));
+                    while (true) { // bulk cycle // TODO: add timeout?
+                        try {
+                            int[] colors = bulk.getNextDataFrame();
+
+                            canvas = surfaceHolder.lockCanvas(null);
+                            if (canvas == null)
+                                continue;
+                            canvas.drawColor(Color.BLACK);
+                            canvas.translate(params.leftTopOfGrid.x, params.leftTopOfGrid.y);
+                            canvas.save();
+
+                            int locatorMarkSize = LocatorMarkGraphic.SIDE_SIZE_IN_UNITS;
+                            int unitSize = params.unitSize;
+
+                            // top stripe
+                            LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_TOP, unitSize);
+                            canvas.save();
+                            canvas.translate(locatorMarkSize * unitSize, 0);
+                            final int stripeBetweenMarksWidth = params.cols - 2 * locatorMarkSize; // in units
+                            int index = drawColorUnitsStripe(canvas, colors, 0, locatorMarkSize, stripeBetweenMarksWidth);
+                            canvas.translate(stripeBetweenMarksWidth * unitSize, 0);
+                            LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.RIGHT_TOP, unitSize);
+                            canvas.restore();
+
+                            // mid stripe
+                            canvas.translate(0, locatorMarkSize * unitSize);
+                            int stripeHeight = params.rows - 2 * locatorMarkSize;
+                            index = drawColorUnitsStripe(canvas, colors, index, stripeHeight, params.cols);
+
+                            // bottom stripe
+                            canvas.translate(0, stripeHeight * unitSize);
+                            LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.LEFT_BOTTOM, unitSize);
+                            canvas.translate(locatorMarkSize * unitSize, 0);
+                            index = drawColorUnitsStripe(canvas, colors, index, locatorMarkSize, stripeBetweenMarksWidth);
+                            canvas.translate(stripeBetweenMarksWidth * unitSize, 0);
+                            LocatorMarkGraphic.draw(canvas, LocatorMarkGraphic.Location.RIGHT_BOTTOM, unitSize);
+                            assert index == colors.length;
+
+                            canvas.restore();
+                        } finally {
+                            if (canvas != null) {
+                                surfaceHolder.unlockCanvasAndPost(canvas);
+                            }
                         }
-                        response = waitForReceiverResponse();
-                        if (!running) {
-                            break;
+                        boolean response;
+                        synchronized (this) {
+                            if (!running) {
+                                return;
+                            }
+                            response = waitForReceiverResponse();
+                            if (!running) {
+                                return;
+                            }
+                            if (response) {
+                                Log.d(LOG_TAG, "Bulk #" + encodingController.getBulkIndex() +
+                                        " was successfully sent");
+                                break;
+                            }
                         }
-                    }
-                    /*
-                    Log.d(LOG_TAG, "data frame #" + generator.getFrameIndex() +
-                            " was successfully sent = " + response);
-                    generator.setSuccess(response);
-                     */
+                    } // bulk cycle
                 }
             }
 
@@ -331,11 +341,17 @@ public class TransmitterActivity extends AppCompatActivity {
             private boolean waitForReceiverResponse() {
                 // currently is mock
                 try {
-                    wait(TimeUnit.SECONDS.toMillis(1));
+                    wait(TimeUnit.SECONDS.toMillis(5));
                 } catch (InterruptedException exc) {
                     return false;
                 }
-                return true;
+                Log.d(LOG_TAG, "frame #" + sentFrames +
+                        " was successfully sent");
+                if (++sentFrames == FRAMES_PER_BULK) {
+                    sentFrames = 0;
+                    return true;
+                }
+                return false;
             }
         }
     }

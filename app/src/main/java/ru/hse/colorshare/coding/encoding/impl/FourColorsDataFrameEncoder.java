@@ -36,10 +36,12 @@ public class FourColorsDataFrameEncoder implements DataFrameEncoder {
         int[] colors = new int[unitsPerFrame];
         int currentColor = 0;
 
+        byte[] wrapper = new byte[1];
         for (; buffer.hasRemaining() && currentColor + UNITS_PER_BYTE <= unitsPerFrame; currentColor += UNITS_PER_BYTE) {
             byte toEncode = buffer.get();
             writeByteAsColors(toEncode, colors, currentColor);
-            checksum.update(toEncode);
+            wrapper[0] = toEncode;
+            checksum.update(wrapper, 0, 1);
         }
 
         for (; currentColor < unitsPerFrame; currentColor++) {

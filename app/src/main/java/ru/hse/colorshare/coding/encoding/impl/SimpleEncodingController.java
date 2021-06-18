@@ -120,7 +120,8 @@ public class SimpleEncodingController implements EncodingController {
 
     @Override
     public void setTransmissionParameters(TransmissionParams params) {
-        setTransmissionParameters(params.getColorFrameSize(), 1);
+        int framesPerBulk = 10;
+        setTransmissionParameters(params.getColorFrameSize(), framesPerBulk);
     }
 
     @Override
