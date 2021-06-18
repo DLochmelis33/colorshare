@@ -341,10 +341,12 @@ public class TransmitterActivity extends AppCompatActivity {
             private boolean waitForReceiverResponse() {
                 // currently is mock
                 try {
-                    wait(TimeUnit.SECONDS.toMillis(5));
+                    wait(TimeUnit.MILLISECONDS.toMillis(300));
                 } catch (InterruptedException exc) {
                     return false;
                 }
+                if(true) return false;
+
                 Log.d(LOG_TAG, "frame #" + sentFrames +
                         " was successfully sent");
                 if (++sentFrames == FRAMES_PER_BULK) {

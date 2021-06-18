@@ -10,6 +10,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.zip.CRC32;
 
 import ru.hse.colorshare.coding.decoding.ByteDataFrame;
@@ -25,7 +27,7 @@ public class SimpleDecodingController implements DecodingController {
     private final AtomicInteger receivedFramesCount = new AtomicInteger(0);
     private CountDownLatch receivedFramesLatch;
     private final AtomicBoolean flushed = new AtomicBoolean(false);
-    private byte[][] receivedBytes;
+    private AtomicReferenceArray<byte[]> receivedBytes;
 
     private final OutputStream outputStream;
 
@@ -44,7 +46,7 @@ public class SimpleDecodingController implements DecodingController {
         receivedFramesCount.set(0);
         flushed.set(false);
 
-        receivedBytes = new byte[checksums.length][];
+        receivedBytes = new AtomicReferenceArray<>(checksums.length);
         for (int i = 0; i < checksums.length; i++) {
             checksumToIndex.put(checksums[i], i);
         }
@@ -63,13 +65,19 @@ public class SimpleDecodingController implements DecodingController {
 
     @Override
     public void testFrame(int[] colors) {
-        ByteDataFrame dataFrame = decoder.decode(colors);
+        ByteDataFrame dataFrame;
+        try {
+            dataFrame = decoder.decode(colors);
+        } catch (NullPointerException e) {
+            Log.w(TAG, "nullpointer");
+            return;
+        }
         Integer assumedIndex = checksumToIndex.get(dataFrame.getChecksum());
-        if(assumedIndex == null) {
+        if (assumedIndex == null) {
             Log.w(TAG, "unknown checksum: " + dataFrame.getChecksum());
         }
-        if (assumedIndex != null && receivedBytes[assumedIndex] != null) {
-            receivedBytes[assumedIndex] = dataFrame.getBytes();
+        if (assumedIndex != null && receivedBytes.get(assumedIndex) == null) {
+            receivedBytes.compareAndSet(assumedIndex, null, dataFrame.getBytes());
             receivedFramesCount.incrementAndGet();
             receivedFramesLatch.countDown();
             Log.d(TAG, "decoded frame #" + assumedIndex);
@@ -82,13 +90,15 @@ public class SimpleDecodingController implements DecodingController {
     }
 
     @Override
-    public void flush() throws IOException {
+    public synchronized void flush() throws IOException {
         if (!isBulkFullyEncoded()) {
             throw new IllegalStateException("You cannot call flush before bulk is fully encoded");
         }
         if (flushed.getAndSet(true))
             return;
-        preprocessor.writeBytes(receivedBytes);
+        for (int i = 0; i < receivedBytes.length(); i++) {
+            preprocessor.writeBytes(receivedBytes.get(i));
+        }
         outputStream.flush();
     }
 

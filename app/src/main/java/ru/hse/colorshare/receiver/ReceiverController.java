@@ -103,6 +103,20 @@ public class ReceiverController {
         // trick to register callback before activity starts
         onFileCreateResultRunnable = this::onFileCreateResult;
 
+//        OutputStream tempFileStream = callerActivity.getContentResolver().openOutputStream(contentTempFileUri);
+//        try {
+//            tempFileStream.write('a');
+//            tempFileStream.write('o');
+//            tempFileStream.write('u');
+//            tempFileStream.write('e');
+//            tempFileStream.write('i');
+//            tempFileStream.write('y');
+//            tempFileStream.flush();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//        saveResult();
+
         isWorking.set(true);
         mainReceiverThread = threadFactory.newThread(this::lifecycle);
     }
@@ -132,12 +146,14 @@ public class ReceiverController {
             } catch (InterruptedException e) {
                 break;
             }
+            Log.w(TAG, "SUCCESS");
 
             if (!decodingController.isBulkFullyEncoded()) {
                 // timed out
                 shutdown(new RuntimeException("bulk processing too long"));
             }
-            fileWriterExecutor.submit(this::fileWritingJob);
+//            fileWriterExecutor.submit(this::fileWritingJob);
+            fileWritingJob();
             isWorking.set(false);
             isSuccess.set(true);
 

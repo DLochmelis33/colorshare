@@ -133,15 +133,9 @@ public class ImageProcessor {
             if (colors != null) {
                 // apparently no built-in method for this
                 int[] colorArray = new int[colors.size()];
-                StringBuilder colorlog = new StringBuilder();
                 for (int i = 0; i < colorArray.length; i++) {
                     colorArray[i] = colors.get(i);
-                    colorlog.append("{");
-                    colorlog.append(convnum(Color.red(colorArray[i]))).append("/");
-                    colorlog.append(convnum(Color.green(colorArray[i]))).append("/");
-                    colorlog.append(convnum(Color.blue(colorArray[i]))).append("}, ");
                 }
-                Log.d(TAG, colorlog.substring(colorlog.length() - 200));
                 ReceiverController.decodingController.testFrame(colorArray);
 //                if (isOutdated("colors checked")) {
 //                    return;

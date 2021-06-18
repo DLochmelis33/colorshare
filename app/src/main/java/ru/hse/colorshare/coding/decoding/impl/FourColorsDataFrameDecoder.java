@@ -43,21 +43,15 @@ public class FourColorsDataFrameDecoder implements ColorDataFrameDecoder {
 
         byte[] decodedBytes = new byte[colors.length / UNITS_PER_BYTE];
         int currentDecoded = 0;
-        StringBuilder sb = new StringBuilder();
         for (int inArray = 0; inArray + UNITS_PER_BYTE <= colors.length; inArray += UNITS_PER_BYTE, currentDecoded++) {
             if (chooser.chooseClosest(colors[inArray]) == FourColorsDataFrameUtil.EMPTY_COLOR) {
                 break;
             }
             decodedBytes[currentDecoded] = readColorsAsByte(colors, inArray);
-            sb.append(Integer.toBinaryString((decodedBytes[currentDecoded] & 0xFF) + 0x100).substring(1));
-            for(int a = 0; a < 52; a++) {
-                sb.append(' ');
-            }
         }
         if (decodedBytes.length != currentDecoded) {
             decodedBytes = Arrays.copyOf(decodedBytes, currentDecoded);
         }
-        Log.d(TAG, sb.substring(sb.length() - 200));
         checksum.reset();
         checksum.update(decodedBytes, 0, decodedBytes.length);
         return new SimpleByteDataFrame(decodedBytes, checksum.getValue());
