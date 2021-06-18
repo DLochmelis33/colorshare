@@ -1,4 +1,4 @@
-package ru.hse.colorshare.coding;
+package ru.hse.colorshare.coding.encoder;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -14,7 +14,7 @@ import ru.hse.colorshare.coding.encoding.EncodingController;
 import ru.hse.colorshare.coding.encoding.impl.SimpleEncodingController;
 import ru.hse.colorshare.coding.exceptions.EncodingException;
 
-import static ru.hse.colorshare.coding.TestUtils.colorsFromBytes;
+import static ru.hse.colorshare.TestUtils.colorsFromBytes;
 
 public class FromSimpleEncodingControllerTest {
     Path resourceDirectory = Paths.get("src", "test", "resources");

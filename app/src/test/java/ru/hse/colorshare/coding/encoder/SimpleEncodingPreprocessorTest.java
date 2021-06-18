@@ -1,4 +1,4 @@
-package ru.hse.colorshare.coding;
+package ru.hse.colorshare.coding.encoder;
 
 import org.junit.Assert;
 import org.junit.Test;

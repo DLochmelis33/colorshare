@@ -1,4 +1,4 @@
-package ru.hse.colorshare.coding;
+package ru.hse.colorshare;
 
 import java.util.Map;
 import java.util.zip.Checksum;

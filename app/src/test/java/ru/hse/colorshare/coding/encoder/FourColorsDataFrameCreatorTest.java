@@ -1,15 +1,16 @@
-package ru.hse.colorshare.coding;
+package ru.hse.colorshare.coding.encoder;
 
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.nio.ByteBuffer;
 
+import ru.hse.colorshare.TestUtils;
 import ru.hse.colorshare.coding.encoding.ColorDataFrame;
 import ru.hse.colorshare.coding.encoding.impl.FourColorsDataFrameEncoder;
 import ru.hse.colorshare.coding.encoding.DataFrameEncoder;
 
-import static ru.hse.colorshare.coding.TestUtils.colorsFromBytes;
+import static ru.hse.colorshare.TestUtils.colorsFromBytes;
 
 public class FourColorsDataFrameCreatorTest {
 

@@ -1,5 +1,6 @@
 package ru.hse.colorshare.coding.decoding.impl;
 
+import java.util.Arrays;
 import android.util.Log;
 
 import java.util.Objects;
@@ -7,6 +8,7 @@ import java.util.zip.Checksum;
 
 import ru.hse.colorshare.coding.decoding.ByteDataFrame;
 import ru.hse.colorshare.coding.decoding.ColorDataFrameDecoder;
+import ru.hse.colorshare.coding.util.FourColorsDataFrameUtil;
 
 import static ru.hse.colorshare.coding.util.FourColorsDataFrameUtil.BITS_PER_UNIT;
 import static ru.hse.colorshare.coding.util.FourColorsDataFrameUtil.FROM_COLORS;
@@ -21,7 +23,7 @@ public class FourColorsDataFrameDecoder implements ColorDataFrameDecoder {
 
     public FourColorsDataFrameDecoder(Checksum checksum) {
         this.checksum = checksum;
-        this.chooser = new FourColorManhattanMetricsColorChooser();
+        this.chooser = new FourColorsMetricsBasedColorChooser(new EuclidMetrics());
     }
 
     private byte readColorsAsByte(int[] colors, int offset) {
@@ -42,12 +44,18 @@ public class FourColorsDataFrameDecoder implements ColorDataFrameDecoder {
         byte[] decodedBytes = new byte[colors.length / UNITS_PER_BYTE];
         int currentDecoded = 0;
         StringBuilder sb = new StringBuilder();
-        for (int inArray = 0; inArray + UNITS_PER_BYTE < colors.length; inArray += UNITS_PER_BYTE, currentDecoded++) {
+        for (int inArray = 0; inArray + UNITS_PER_BYTE <= colors.length; inArray += UNITS_PER_BYTE, currentDecoded++) {
+            if (chooser.chooseClosest(colors[inArray]) == FourColorsDataFrameUtil.EMPTY_COLOR) {
+                break;
+            }
             decodedBytes[currentDecoded] = readColorsAsByte(colors, inArray);
             sb.append(Integer.toBinaryString((decodedBytes[currentDecoded] & 0xFF) + 0x100).substring(1));
             for(int a = 0; a < 52; a++) {
                 sb.append(' ');
             }
+        }
+        if (decodedBytes.length != currentDecoded) {
+            decodedBytes = Arrays.copyOf(decodedBytes, currentDecoded);
         }
         Log.d(TAG, sb.substring(sb.length() - 200));
         checksum.reset();
