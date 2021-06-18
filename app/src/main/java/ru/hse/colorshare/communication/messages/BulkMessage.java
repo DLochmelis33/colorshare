@@ -33,8 +33,8 @@ public class BulkMessage extends Message {
     @Override
     protected byte[] toByteArray() {
         ByteBuffer byteBuffer = ByteBuffer.allocate(getSizeInBytes());
-        byteBuffer.putInt(gridRows);
-        byteBuffer.putInt(gridCols);
+        byteBuffer.putChar((char) gridRows);
+        byteBuffer.putChar((char) gridCols);
         for (long checksum : bulkChecksums) {
             byteBuffer.putLong(checksum);
         }
@@ -42,8 +42,8 @@ public class BulkMessage extends Message {
     }
 
     public static Message parseDerivedFrom(ByteBuffer byteBuffer) {
-        int gridRows = byteBuffer.getInt();
-        int gridCols = byteBuffer.getInt();
+        int gridRows = byteBuffer.getChar();
+        int gridCols = byteBuffer.getChar();
         List<Long> checksumsList = new ArrayList<>();
         while (byteBuffer.remaining() >= Long.SIZE / 8) {
             checksumsList.add(byteBuffer.getLong());
@@ -59,6 +59,7 @@ public class BulkMessage extends Message {
     }
 
     private int getSizeInBytes() {
-        return 3 * Integer.SIZE / 8 + bulkChecksums.length * Long.SIZE / 8;
+        return 2 * Character.SIZE / 8 + bulkChecksums.length * Long.SIZE / 8;
+//        return 2 * Integer.SIZE / 8 + bulkChecksums.length * Long.SIZE / 8;
     }
 }

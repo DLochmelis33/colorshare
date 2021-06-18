@@ -40,7 +40,7 @@ public abstract class Message {
         ByteBuffer byteBuffer = ByteBuffer.allocate(getSizeInBytes() + messageBytes.length);
         byteBuffer.putInt(message.getId());
         byteBuffer.putLong(message.getSenderId());
-        byteBuffer.putInt(message.getMessageType().ordinal());
+        byteBuffer.putShort((short) message.getMessageType().ordinal());
         byteBuffer.put(messageBytes);
         return byteBuffer.array();
     }
@@ -49,7 +49,7 @@ public abstract class Message {
         ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray, 0, byteArray.length);
         int id = byteBuffer.getInt();
         long senderId = byteBuffer.getLong();
-        MessageType messageType = MessageType.values()[byteBuffer.getInt()];
+        MessageType messageType = MessageType.values()[byteBuffer.getShort()];
         Message parsedMessage;
         switch (messageType) {
             case PAIRING:
@@ -77,7 +77,7 @@ public abstract class Message {
     protected abstract byte[] toByteArray();
 
     private static int getSizeInBytes() {
-        return 2 * Integer.SIZE / 8 + Long.SIZE / 8;
+        return Integer.SIZE / 8 + Long.SIZE / 8 + Character.SIZE / 8;
     }
 
     public enum MessageType {

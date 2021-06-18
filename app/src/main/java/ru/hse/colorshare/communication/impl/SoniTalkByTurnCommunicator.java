@@ -8,6 +8,7 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -38,6 +39,8 @@ import ru.hse.colorshare.communication.Message;
 public class SoniTalkByTurnCommunicator implements ByTurnsCommunicator, SoniTalkDecoder.MessageListener, SoniTalkPermissionsResultReceiver.Receiver {
 
     private static final int REQUEST_RECORD_AUDIO_PERMISSION = 65;
+    private static final String LOG_TAG = "ColorShare:soniTalk";
+
     private final long uniqueId;
     private long partnerId;
     private Activity activity;
@@ -259,7 +262,7 @@ public class SoniTalkByTurnCommunicator implements ByTurnsCommunicator, SoniTalk
         SoniTalkEncoder soniTalkEncoder = soniTalkContext.getEncoder(config);
 
         byte[] messageBytes = Message.toByteArray(message);
-        if (messageBytes.length > nMaxBytes || EncoderUtils.isAllowedByteArraySize(messageBytes, config)) {
+        if (messageBytes.length > nMaxBytes || !EncoderUtils.isAllowedByteArraySize(messageBytes, config)) {
             throw new IllegalArgumentException("message is too long, nMaxBytes = " + nMaxBytes);
         }
         return soniTalkEncoder.generateMessage(messageBytes);
